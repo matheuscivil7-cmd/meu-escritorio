@@ -915,7 +915,7 @@ async function executarAcao(id, op){
   const esc_id = S.escritorio.id;
   try{
     if(pd.acao==="processo"){
-      let cli = d.cliente_id;
+      let cli = d.cliente_id || (S.clientes.find(c=>nrm(c.nome)===nrm(d.cliente))||{}).id;
       if(!cli){ const c = await api.inserir("clientes", {escritorio_id:esc_id, nome:d.cliente, tipo:/ltda|s\.a\.|eireli/i.test(d.cliente)?"PJ":"PF", obs:d.exemplo?"Cliente fictício criado para teste.":null}); cli = c.id; await recarregar("clientes", true); }
       const r = await api.inserir("processos", Object.assign({escritorio_id:esc_id, cliente_id:cli}, d.processo));
       if(d.exemplo){
