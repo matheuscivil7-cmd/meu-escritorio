@@ -163,6 +163,9 @@ P.criarDemo = function(){
     async prefs(){ return null; }, async salvarPrefs(){},
     async servico(acao, d){
       if(acao==="datajud") return {tribunal:"TRT2", encontrado:true, classe:"Ação Trabalhista - Rito Ordinário", orgao:"4ª Vara do Trabalho de Osasco", assuntos:["Horas Extras"], movimentos:[{data:new Date().toISOString(), nome:"Juntada de Petição", detalhe:"Manifestação"},{data:P.addDays(new Date(),-9).toISOString(), nome:"Audiência designada", detalhe:"instrução"},{data:P.addDays(new Date(),-40).toISOString(), nome:"Distribuído por sorteio", detalhe:""}]};
+      if(acao==="jurisprudencia") return {fonte:"TJSP (demonstração)", termo:d.q, pagina:d.pagina||1, total:2, itens:[
+        {numero:"1000592-29.2025.8.26.0106", classe:"Apelação Cível / Transporte Aéreo", relator:"Relator de exemplo", comarca:"São Paulo", orgao:"16ª Câmara de Direito Privado", julgamento:"15/10/2026", publicacao:"16/10/2026", ementa:"Ementa: APELAÇÃO CÍVEL – Exemplo de acórdão. Com o Supabase configurado, aqui aparecem os acórdãos reais do TJSP.", link:""},
+        {numero:"1014228-79.2025.8.26.0068", classe:"Apelação Cível / Cancelamento de voo", relator:"Relatora de exemplo", comarca:"Barueri", orgao:"16ª Câmara de Direito Privado", julgamento:"15/10/2026", publicacao:"16/10/2026", ementa:"Ementa: Segundo exemplo de acórdão.", link:""}]};
       if(acao==="indices"){ const [di,mi,ai] = d.de.split("/").map(Number), [df,mf,af] = d.ate.split("/").map(Number); const v = []; let y = ai, m = mi; while(y<af || (y===af && m<=mf)){ v.push({data:`01/${String(m).padStart(2,"0")}/${y}`, valor: d.serie==="selic"?0.9:d.serie==="igpm"?0.3:0.4}); m++; if(m>12){ m=1; y++; } } return {serie:d.serie, valores:v}; }
       return {};
     },

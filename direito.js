@@ -6,6 +6,9 @@ const B = []; // base de respostas
 const add = (area, tema, chaves, resp, base) => B.push({id:"d"+B.length, area, tema, chaves, resp, base});
 
 /* ---------------- TRABALHISTA ---------------- */
+add("trabalhista","Contestação (defesa) trabalhista","contestacao contestar defesa reclamada reclamado prazo audiencia trabalhista pje resposta",
+"- A defesa da reclamada é apresentada **na audiência**: oral, em até 20 minutos, ou escrita (art. 847 da CLT).\n- No PJe, a contestação e os documentos podem ser juntados **até a audiência** (art. 847, parágrafo único).\n- A notificação deve chegar pelo menos **5 dias** antes da audiência (art. 841).\n- Se a reclamada faltar à audiência, há revelia e confissão sobre os fatos (art. 844).",
+"CLT, arts. 841, 844 e 847");
 add("trabalhista","Prazo do recurso ordinário","recurso ordinario prazo trabalhista sentenca vara trt recorrer contrarrazoes deposito recursal custas",
 "- **8 dias úteis** para interpor recurso ordinário contra sentença da Vara do Trabalho; contrarrazões no mesmo prazo.\n- Desde a Reforma de 2017, os prazos da CLT contam em **dias úteis**.\n- O empregador recorrente precisa comprovar **depósito recursal e custas** no prazo do recurso, salvo isenções legais.",
 "CLT, arts. 775, 895 e 899");
@@ -92,6 +95,9 @@ add("civel","Inversão do ônus da prova","inversao onus prova consumidor hiposs
 add("civel","Juizado Especial Cível","juizado especial civel pequenas causas jec limite valor sem advogado recurso inominado",
 "- Causas até **40 salários mínimos**; até **20** a parte pode ir sem advogado.\n- Sem custas no 1º grau.\n- Recurso inominado em **10 dias**, com preparo em 48 horas.\n- Prazos em dias úteis.",
 "Lei 9.099/95, arts. 3º, 9º, 12-A, 42 e 54");
+add("civel","Dano moral no transporte aéreo (atraso e cancelamento de voo)","dano moral atraso voo cancelamento aereo companhia aerea overbooking bagagem extravio passageiro anac montreal",
+"- O dano moral por atraso ou cancelamento de voo **não é presumido**: é preciso provar o prejuízo concreto (art. 251-A do Código Brasileiro de Aeronáutica, incluído pela Lei 14.034/2020; STJ, REsp 1.796.716/MG).\n- Pesam no caso: tempo de atraso, assistência prestada, perda de compromisso, chegada de madrugada, crianças ou idosos.\n- Assistência material da Resolução ANAC 400/2016: a partir de 1 hora, comunicação; 2 horas, alimentação; 4 horas, hospedagem (quando houver pernoite) e reacomodação ou reembolso.\n- Voo internacional: dano material segue as Convenções de Varsóvia e Montreal (STF, Tema 210); dano moral não segue a Convenção (STF, Tema 1.240).",
+"CBA, art. 251-A; Resolução ANAC 400/2016; STF, Temas 210 e 1.240");
 add("civel","Dano moral e negativação indevida","dano moral negativacao indevida nome sujo serasa spc indenizacao juros correcao",
 "- Anotação anterior legítima afasta o dano moral pela nova negativação (Súmula 385 do STJ).\n- Juros de mora desde o evento danoso, na responsabilidade extracontratual (Súmula 54 do STJ).\n- Correção monetária desde o arbitramento (Súmula 362 do STJ).\n- Bancos respondem por fraudes de terceiros em operações bancárias (Súmula 479 do STJ).",
 "Súmulas 54, 362, 385 e 479 do STJ");

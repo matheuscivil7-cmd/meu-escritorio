@@ -1210,7 +1210,7 @@ async function acaoPecas(a, el){
       const ja = new Set(docsDe(p.id).map(d=>nrm(d.nome)));
       await comErro(async()=>{ for(const nome of ck[2].filter(i=>!ja.has(nrm(i)))) await api.inserir("documentos", {escritorio_id:S.escritorio.id, processo_id:p.id, nome, status:"Aguardando cliente", data:hoje(), visivel_cliente:true}); await recarregar("documentos", true); toast("Checklist adicionado ao processo"); render(); });
       return true; }
-    case "copiar-txt-el": { const t = document.getElementById(el.dataset.el)?.value || ""; try{ await navigator.clipboard.writeText(t); toast("Mensagem copiada"); }catch(_){ toast("Selecione e copie o texto"); } return true; }
+    case "copiar-txt-el": { const t = el.dataset.txt || document.getElementById(el.dataset.el)?.value || ""; try{ await navigator.clipboard.writeText(t); toast(el.dataset.txt ? "Ementa copiada" : "Mensagem copiada"); }catch(_){ toast("Selecione e copie o texto"); } return true; }
     case "pc-mod-novo": abrirModal({kind:"modelo", tipo:el.dataset.t}); return true;
     case "pc-mod-editar": abrirModal({kind:"modelo", id:el.dataset.id}); return true;
     case "pc-mod-copiar": { const t = P.TESES.find(x=>x.id===el.dataset.id); abrirModal({kind:"modelo", tipo:"tese", pre:{area:t.area, titulo:t.titulo, texto:t.texto, extra:{fundamento:t.fundamento, pedido:t.pedido}}}); return true; }
@@ -1674,7 +1674,8 @@ function vDireito(voltar){
   const areas = [["todas","Todas"],["trabalhista","Trabalhista"],["civel","Cível"],["criminal","Criminal"]];
   const sums = P.SUMULAS.filter(s=>DG.area==="todas" || s[3]===DG.area);
   const UF = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SE","SP","TO"];
-  return `<div class="head"><div><h1>Direito geral</h1><div class="sub">Temas do dia a dia com prazo e fundamento, súmulas de consulta frequente, pesquisa de jurisprudência nos tribunais e acesso às leis.</div></div>${voltar||""}</div>
+  return `<div class="head"><div><h1>Direito geral</h1><div class="sub">Assistente para dúvidas, jurisprudência e consulta de processos, além dos temas com prazo e fundamento, súmulas e leis.</div></div>${voltar||""}</div>
+  ${blocoAssistenteJuridico()}
   ${voltar?"":blocoRadar()}
   <div class="tabs" role="tablist"><span class="ind"></span>${areas.map(([k,l])=>`<button role="tab" aria-selected="${DG.area===k}" data-act="dg-area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}</button>`).join("")}</div>
   <div class="dg-grid">
@@ -1700,6 +1701,111 @@ function vDireito(voltar){
         <h2 style="font-size:1.05rem;margin:0">Leis (Planalto)</h2>
         <div class="leis">${P.LEIS.map(([n,u])=>`<a class="lei" href="${u}" target="_blank" rel="noopener">${esc(n)} ${ICON.arrow}</a>`).join("")}</div></div></div>
     </div></div>`;
+}
+/* ---------- ASSISTENTE JURÍDICO (Direito geral) ---------- */
+const DGA = {msgs:[], input:"", ocupado:false, ctx:{}};
+const RE_CNJ = /\b\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}\b/;
+const L_ = "[0-9A-Za-zÀ-ÖØ-öø-ÿ]";
+const PARADAS_JUR = new RegExp(`(?<!${L_})(pesquis${L_}*|busc${L_}*|procur${L_}*|encontr${L_}*|mostr${L_}*|traga|quero|preciso|gostaria|me|ver|veja|liste|jurisprud${L_}*|julgad${L_}*|ac[oó]rd[aã]${L_}*|precedent${L_}*|decis[oõ]${L_}*|entendiment${L_}*|sobre|acerca|respeito|tjsp|tj\\s?sp|do|da|de|dos|das|no|na|nos|nas|o|a|os|as|um|uma|que|tribuna${L_}*|dizem|diz|recent${L_}*|atua${L_}*|em|com|para|por|qual|quais|e|stf|stj|tst|trt\\d*|tj\\s?[a-z]{2}|supremo|superior)(?!${L_})`, "gi");
+const ehPedidoJuris = q => /jurisprud|julgad|ac[oó]rd|precedent|decis[oõ]es|entendimento d|o que (os )?tribunais|como (o|os) (tj|tribuna)/i.test(q);
+const termosJuris = q => q.replace(RE_CNJ,"").replace(/[?!.;:"“”]/g," ").replace(PARADAS_JUR," ").replace(/\s+/g," ").trim();
+function tribunalCitado(q){
+  const n = nrm(q);
+  if(/\bstf\b|supremo/.test(n)) return "stf"; if(/\bstj\b|superior tribunal de justica/.test(n)) return "stj";
+  if(/\btst\b|superior do trabalho/.test(n)) return "tst"; if(/\btrt\b|regional do trabalho/.test(n)) return "trt";
+  const m = n.match(/\btj\s?([a-z]{2})\b/); if(m && m[1]!=="sp") return "tj:"+m[1].toUpperCase();
+  return "";
+}
+function sumulasDe(q){
+  const ws = nrm(q).split(/[^a-z0-9]+/).filter(w=>w.length>3).map(w=>w.slice(0,6));
+  if(!ws.length) return [];
+  return P.SUMULAS.map(s=>{ const t = nrm(s[2]+" "+s[1]); return [s, ws.filter(w=>t.includes(w)).length]; })
+    .filter(([s,n])=>n>=Math.min(2, ws.length)).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
+}
+function linksJuris(q){
+  return `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">Pesquisar também em:</span>${["stf","stj","tst","jusbrasil"].map(o=>`<button class="linkbtn small" data-act="juris" data-o="${o}" data-q="${esc(q)}">${P.ONDE_PESQUISAR.find(x=>x[0]===o)[1]}</button>`).join("")}</div>`;
+}
+function htmlProcessoPublico(num, r){
+  const c = P.cnjInfo(num);
+  if(r.erro) return `<p><b>Processo ${esc(c.formatado||num)}</b></p><div class="err">${esc(r.erro)}</div>`;
+  if(!r.encontrado) return `<p><b>Processo ${esc(c.formatado||num)}</b> · ${esc(r.tribunal||c.segmento||"")}</p><p class="small">Não encontrei este número na base pública do CNJ (DataJud). Pode ser processo em segredo de justiça, muito recente (a base leva alguns dias para receber) ou número digitado errado.</p>`;
+  const movs = r.movimentos||[], ult = movs[0];
+  const lin = m => `<li><span class="mono small">${fmt((m.data||"").slice(0,10))}</span> ${esc(m.nome)}${m.detalhe?` <span class="muted small">(${esc(m.detalhe)})</span>`:""}</li>`;
+  const meu = typeof S!=="undefined" && S.processos && S.processos.find(p=>P.soDigitos(p.numero)===P.soDigitos(num));
+  const equipe = typeof S!=="undefined" && S.perfil && !ehCliente();
+  return `<div class="proc-pub"><div class="row" style="justify-content:space-between;gap:8px"><b>Processo ${esc(c.formatado||num)}</b><span class="chip neutral">${esc(r.tribunal)}</span></div>
+    <div class="grid2 small" style="margin-top:6px;gap:4px 14px">
+      ${r.classe?`<div><span class="muted">Classe:</span> ${esc(r.classe)}</div>`:""}${r.orgao?`<div><span class="muted">Órgão:</span> ${esc(r.orgao)}</div>`:""}
+      ${r.assuntos&&r.assuntos.length?`<div><span class="muted">Assunto:</span> ${esc(r.assuntos.slice(0,3).join(", "))}</div>`:""}
+      ${r.ajuizamento?`<div><span class="muted">Ajuizamento:</span> ${esc(r.ajuizamento.slice(6,8)+"/"+r.ajuizamento.slice(4,6)+"/"+r.ajuizamento.slice(0,4))}</div>`:""}</div>
+    ${ult?`<div class="ultimo"><span class="muted small">Situação mais recente</span><div><b>${esc(ult.nome)}</b>${ult.detalhe?` · ${esc(ult.detalhe)}`:""} <span class="mono small">${fmt((ult.data||"").slice(0,10))}</span></div></div>`:""}
+    ${movs.length?`<ul class="movs">${movs.slice(0,8).map(lin).join("")}</ul>${movs.length>8?`<details><summary class="small">Ver todas as ${movs.length} movimentações</summary><ul class="movs">${movs.slice(8).map(lin).join("")}</ul></details>`:""}`:""}
+    <div class="row" style="gap:6px;margin-top:8px">${meu?`<button class="btn" data-act="dj-abrir" data-id="${meu.id}">Abrir no escritório</button>`:equipe?`<button class="btn" data-act="dga-cadastrar" data-n="${esc(c.formatado||num)}">Cadastrar no escritório</button>`:""}</div>
+    <div class="hint">Dados públicos do CNJ (DataJud), atualizados pelos tribunais com alguns dias de atraso. Processos em segredo de justiça não aparecem. Confira no sistema do tribunal antes de agir.</div></div>`;
+}
+function htmlJuris(r, termo){
+  if(r.erro) return `<div class="err">${esc(r.erro)}</div>`;
+  if(!r.itens || !r.itens.length) return `<p class="small">O TJSP não retornou acórdãos para <b>${esc(termo)}</b>. Tente com menos palavras ou sinônimos.</p>`;
+  const em = e => { const i = e.indexOf("Ementa:"); return (i>=0 ? e.slice(i+7) : e).trim(); };
+  return `<p class="small muted">${Number(r.total||0).toLocaleString("pt-BR")} acórdão(s) no TJSP para <b>${esc(r.termo)}</b> · mais recentes primeiro</p>
+    <div class="juris-lista">${r.itens.slice(0,8).map(x=>`<div class="juris-item">
+      <div class="row" style="justify-content:space-between;gap:8px"><span class="mono small">${esc(x.numero)}</span><span class="small muted">${esc(x.julgamento)}</span></div>
+      <div class="small"><b>${esc(x.classe)}</b></div>
+      <div class="small muted">${esc([x.orgao, x.relator&&"Rel. "+x.relator, x.comarca].filter(Boolean).join(" · "))}</div>
+      <details><summary class="small">${esc(em(x.ementa).slice(0,220))}${em(x.ementa).length>220?"…":""}</summary><div class="small" style="white-space:pre-line;margin-top:4px">${esc(em(x.ementa))}</div></details>
+      <div class="row" style="gap:10px">${x.link?`<a class="linkbtn small" href="${esc(x.link)}" target="_blank" rel="noopener">Inteiro teor (PDF)</a>`:""}<button class="linkbtn small" data-act="copiar-txt-el" data-txt="${esc(em(x.ementa)+"\n(TJSP; "+x.classe+" "+x.numero+"; Relator(a): "+x.relator+"; Órgão Julgador: "+x.orgao+"; Data do Julgamento: "+x.julgamento+")")}">Copiar ementa com referência</button></div></div>`).join("")}</div>
+    ${r.total>8?`<button class="btn ghost" data-act="dga-mais" data-q="${esc(r.termo)}" data-p="${(r.pagina||1)+1}">Ver mais acórdãos</button>`:""}`;
+}
+async function responderJuridico(q){
+  const partes = [], cnj = (q.match(RE_CNJ)||[])[0];
+  // 1) número de processo: consulta pública no DataJud (qualquer processo, não só da carteira)
+  if(cnj){
+    const c = P.cnjInfo(cnj);
+    if(c.completo && !c.valido) partes.push(`<div class="err">O número ${esc(c.formatado)} tem dígito verificador inválido. Confira se foi digitado certo.</div>`);
+    else { try{ partes.push(htmlProcessoPublico(cnj, await api.servico("datajud", {numero:cnj}) || {})); }catch(e){ partes.push(`<div class="err">${esc(P.erroAmigavel(e))}</div>`); } }
+    if(!termosJuris(q.replace(cnj,"")).replace(/\b(status|situa\w*|andament\w*|process\w*|consult\w*|numero|n[ºo°])\b/gi,"").trim()) return partes.join("");
+  }
+  const texto = q.replace(RE_CNJ,"").trim();
+  const pedeJuris = ehPedidoJuris(texto), trib = tribunalCitado(texto), termo = termosJuris(texto);
+  // 2) base do app: regra, prazo e fundamento
+  const temas = P.buscarBase(texto, "todas", 3, pedeJuris ? 3.5 : 2), kb = temas.length > 0;
+  if(kb){ const e = temas[0];
+    partes.push(`<div class="kb"><div class="row" style="gap:8px;margin-bottom:4px"><b>${esc(e.tema)}</b>${e.area!=="geral"?`<span class="chip ${e.area}">${P.NOME_AREA_DIREITO[e.area]}</span>`:""}</div>${P.md(e.resp)}<div class="small muted" style="margin-top:6px">Fundamento: ${esc(e.base)}</div>
+      ${temas.length>1?`<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">Temas próximos:</span>${temas.slice(1).map(t=>`<button class="linkbtn small" data-act="dga-sug" data-q="${esc(t.tema)}">${esc(t.tema)}</button>`).join("")}</div>`:""}</div>`); }
+  const sums = sumulasDe(texto);
+  if(sums.length) partes.push(`<div class="kb"><b>Súmulas relacionadas</b>${sums.map(s=>`<div class="sumula"><span class="chip neutral mono">${s[0]} ${s[1]}</span><span class="small">${esc(s[2])}</span></div>`).join("")}</div>`);
+  // 3) jurisprudência: TJSP direto no app; demais tribunais por atalho
+  if(termo && (pedeJuris || !kb)){
+    if(trib && trib!=="tjsp"){
+      const nome = trib.startsWith("tj:") ? "TJ"+trib.slice(3) : trib.toUpperCase();
+      partes.push(`<p class="small">O ${esc(nome)} não permite consulta automática pelo app. Abra a busca já filtrada:</p><div class="row" style="gap:6px"><button class="btn" data-act="juris" data-o="${trib.startsWith("tj:")?"tj":trib}" data-q="${esc(termo)}">${esc(nome)}: ${esc(termo)}</button><button class="btn ghost" data-act="juris" data-o="jusbrasil" data-q="${esc(termo)}">JusBrasil</button></div>`);
+    } else {
+      try{ const r = await api.servico("jurisprudencia", {q:termo}); partes.push(`<div class="kb"><b>Jurisprudência do TJSP</b>${htmlJuris(r||{}, termo)}${linksJuris(termo)}</div>`); }
+      catch(e){ partes.push(`<div class="err">Não consegui consultar o TJSP agora (${esc(P.erroAmigavel(e))}).</div>${linksJuris(termo)}`); }
+    }
+  } else if(kb && termo){
+    partes.push(`<div class="row" style="gap:6px"><button class="btn ghost" data-act="dga-sug" data-q="${esc("jurisprudência "+termo)}">Ver acórdãos do TJSP sobre isto</button></div>`);
+  }
+  if(!partes.length) return semResposta(texto || q);
+  return partes.join("");
+}
+async function enviarDGA(q){
+  q = String(q ?? DGA.input).trim(); if(!q || DGA.ocupado) return;
+  DGA.msgs.push({role:"user", content:q}); DGA.input = ""; DGA.ocupado = true;
+  const m = {role:"assistant", html:`<div class="row muted"><span class="spinner"></span> ${RE_CNJ.test(q)?"Consultando o processo no DataJud…":ehPedidoJuris(q)?"Pesquisando acórdãos no TJSP…":"Procurando a resposta…"}</div>`};
+  DGA.msgs.push(m); refazer(); rolarDGA();
+  try{ m.html = await responderJuridico(q); }catch(e){ m.html = `<div class="err">${esc(P.erroAmigavel(e))}</div>`; }
+  DGA.ocupado = false; refazer(); rolarDGA();
+}
+function rolarDGA(){ const f = $("#dga-fim"); if(f) f.scrollIntoView({block:"nearest"}); }
+function blocoAssistenteJuridico(){
+  const sug = ["Qual o prazo para contestar no trabalhista?","Jurisprudência sobre dano moral por atraso de voo","0000832-35.2018.4.01.3202","Prisão preventiva: requisitos","Julgados do TJSP sobre negativação indevida"];
+  return `<div class="panel dga"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
+    <div class="row" style="justify-content:space-between;gap:8px"><div><h2 style="font-size:1.05rem;margin:0">${ICON.assistente} Assistente jurídico</h2><div class="small muted">Tire dúvidas, pesquise jurisprudência ou consulte o andamento de <b>qualquer processo</b> pelo número, mesmo que não seja do escritório.</div></div>${DGA.msgs.length?`<button class="btn ghost" data-act="dga-limpar">Nova conversa</button>`:""}</div>
+    ${DGA.msgs.length?`<div class="chat dga-chat">${DGA.msgs.map(m=>m.role==="user"?`<div class="msg user">${esc(m.content)}</div>`:`<div class="msg bot answer">${m.html}</div>`).join("")}<div id="dga-fim"></div></div>`
+      :`<div class="pickchips">${sug.map(s=>`<button data-act="dga-sug" data-q="${esc(s)}">${esc(s)}</button>`).join("")}</div>`}
+    <div class="composer" style="position:static;margin:0"><textarea id="dga-in" rows="1" data-bind="DGA.input" placeholder="Pergunte, cole um número de processo ou peça jurisprudência">${esc(DGA.input)}</textarea><button class="btn primary" data-act="dga-enviar" ${DGA.ocupado?"disabled":""}>Enviar</button></div>
+    <div class="hint">Sem IA paga: as respostas vêm da base do app, da consulta pública de jurisprudência do TJSP e do DataJud (CNJ). STF, STJ, TST e outros TJs abrem por atalho, porque não permitem consulta automática. Confira sempre a fonte oficial.</div></div></div>`;
 }
 /* ---------- RELATÓRIOS ---------- */
 function vRelatorios(){
@@ -2267,6 +2373,14 @@ document.addEventListener("click", async e => {
     /* assistente do escritório */
     case "ch-enviar": enviarChatEscritorio(); break;
     case "ch-sug": enviarChatEscritorio(el.dataset.q); break;
+    case "dga-enviar": enviarDGA(); break;
+    case "dga-sug": enviarDGA(el.dataset.q); break;
+    case "dga-limpar": DGA.msgs = []; refazer(); break;
+    case "dga-cadastrar": abrirModal({kind:"processo", pre:{numero:el.dataset.n}}); break;
+    case "dga-mais": { const q = el.dataset.q, pg = Number(el.dataset.p)||2; el.disabled = true; el.textContent = "Carregando…";
+      try{ const r = await api.servico("jurisprudencia", {q, pagina:pg}); const msgEl = el.closest(".msg"); const idx = msgEl ? [...document.querySelectorAll(".dga-chat .msg")].indexOf(msgEl) : -1;
+        const div = document.createElement("div"); div.innerHTML = htmlJuris(r||{}, q); el.replaceWith(div); if(idx>=0 && DGA.msgs[idx]) DGA.msgs[idx].html = msgEl.innerHTML; }
+      catch(e){ el.disabled = false; el.textContent = "Tentar de novo"; toast(P.erroAmigavel(e)); } break; }
     case "ch-limpar": CH.msgs = []; render(); break;
     case "dg-area": DG.area = el.dataset.a; refazer(); break;
     case "dg-abrir": DG.aberto = DG.aberto===el.dataset.id ? "" : el.dataset.id; refazer(); break;
@@ -2311,7 +2425,7 @@ document.addEventListener("submit", async e => {
 });
 document.addEventListener("input", e => {
   const el = e.target, b = el.dataset.bind;
-  if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH,DG,PC,FIN,CALC})[o][k] = el.value; return; }
+  if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH,DG,DGA,PC,FIN,CALC})[o][k] = el.value; return; }
   if(el.id==="dg-busca"){ DG.termo = el.value; const l = $("#dg-lista"); if(l) l.innerHTML = listaTemas(); return; }
   if(el.dataset.calc && el.type!=="checkbox"){ L.calc[el.dataset.calc] = el.value; const pos = el.selectionStart; const idEl = el.id; mostrarInicio(); const n = document.getElementById(idEl); if(n && n.type!=="date"){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(_){} } return; }
   if(el.id==="cnj-in"){ L.cnj = P.mascaraCNJ(el.value); mostrarInicio(); const n = $("#cnj-in"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); return; }
@@ -2325,9 +2439,9 @@ document.addEventListener("change", async e => {
   if(el.dataset.file && el.dataset.file.startsWith("portal")){ await enviarPortal(el.dataset.file, el.files[0], el); el.value = ""; return; }
   if(el.dataset.file){ await receberArquivo(el.dataset.file, el.files[0], el.dataset.proc); el.value = ""; return; }
   if(el.dataset.act==="at-status"){ await comErro(async()=>{ await api.atualizar("atendimentos", el.dataset.id, {status:el.value}); await recarregar("atendimentos", true); render(); }); return; }
-  if(el.dataset.bind && el.dataset.re && el.tagName==="INPUT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,PC,FIN,CALC})[o][k] = el.value; pcMudou(el.dataset.re); return; }
+  if(el.dataset.bind && el.dataset.re && el.tagName==="INPUT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,DGA,PC,FIN,CALC})[o][k] = el.value; pcMudou(el.dataset.re); return; }
   if(el.dataset.calc){ L.calc[el.dataset.calc] = el.type==="checkbox" ? el.checked : el.value; mostrarInicio(); return; }
-  if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,PC,FIN,CALC})[o][k] = el.value; if(el.dataset.re) pcMudou(el.dataset.re); return; }
+  if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,DGA,PC,FIN,CALC})[o][k] = el.value; if(el.dataset.re) pcMudou(el.dataset.re); return; }
   if(el.id==="a-logo" && el.files[0]){ const f = el.files[0]; const img = new Image(); img.onload = ()=>{ const r = Math.min(1, 420/img.width, 140/img.height); const c = document.createElement("canvas"); c.width = Math.round(img.width*r); c.height = Math.round(img.height*r); c.getContext("2d").drawImage(img,0,0,c.width,c.height); LOGO_TMP = c.toDataURL("image/png"); const pv = $("#a-logo-prev"); if(pv){ pv.src = LOGO_TMP; pv.hidden = false; } URL.revokeObjectURL(img.src); }; img.src = URL.createObjectURL(f); return; }
   if(el.id==="daily-dia"){ D.dia = el.value; render(); return; }
   if(el.id==="l-papel"){ L.papelPedido = el.value; return; }
@@ -2342,6 +2456,7 @@ document.addEventListener("keydown", e => {
   if(e.key==="Escape" && modal) fecharModal();
   if(e.key==="Enter" && !e.shiftKey && e.target.id==="chat-in"){ e.preventDefault(); enviarChatLivre(); }
   if(e.key==="Enter" && !e.shiftKey && e.target.id==="ch-in"){ e.preventDefault(); enviarChatEscritorio(); }
+  if(e.key==="Enter" && !e.shiftKey && e.target.id==="dga-in"){ e.preventDefault(); enviarDGA(); }
   if(e.key==="Enter" && (e.target.id==="and-txt" || e.target.id==="doc-nome")){ e.preventDefault(); e.target.closest(".row").querySelector("button").click(); }
   if(e.key==="Enter" && e.target.classList && e.target.classList.contains("me")) abrirModal({kind:"perfil"});
 });

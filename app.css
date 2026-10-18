@@ -611,3 +611,17 @@ a.daily-item:hover .thumb img{transform:scale(1.06)}
 @media (max-width:980px){.portal-grid{grid-template-columns:minmax(0,1fr)}.contato-card{position:static;order:-1}}
 @media (max-width:560px){.portal-kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.kanban{grid-template-columns:repeat(5,82vw)}.br{grid-template-columns:minmax(0,1fr) 80px auto}}
 .contato-card .adv{flex-wrap:wrap}.contato-card .adv > .row{flex-basis:100%}
+/* assistente jurídico (Direito geral) */
+.dga{margin-bottom:16px}
+.dga h2 svg{width:18px;height:18px;vertical-align:-3px;margin-right:4px}
+.dga-chat{max-height:560px;overflow-y:auto;padding:4px 2px;overscroll-behavior:contain}
+.dga .msg.bot{max-width:100%}
+.proc-pub .ultimo{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2,rgba(127,127,127,.08));border:1px solid var(--line)}
+.movs{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.movs li{font-size:.86rem}
+.juris-lista{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.juris-item{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.juris-item summary{cursor:pointer;line-height:1.45}
+.dga details summary{cursor:pointer}
+@media (max-width:640px){.dga-chat{max-height:none}}
+.dga .composer{background:transparent;padding:0;border:0;box-shadow:none}
