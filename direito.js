@@ -65,6 +65,9 @@ add("trabalhista","Intervalo para almoço","intervalo intrajornada almoco descan
 add("civel","Prazos do CPC","prazo cpc dias uteis contestacao replica recurso apelacao quinze dias fazenda publica dobro",
 "- Prazos processuais do CPC contam em **dias úteis**.\n- **15 dias**: contestação, réplica, apelação, agravo, recursos aos tribunais superiores e contrarrazões.\n- **5 dias**: embargos de declaração.\n- Fazenda Pública, MP e Defensoria têm prazo em **dobro**. Litisconsortes com advogados de escritórios diferentes também, mas só em autos físicos.",
 "CPC, arts. 180, 183, 186, 219, 229, 335 e 1.003, § 5º");
+add("civel","Contestação","contestacao contestar defesa reu prazo resposta citacao audiencia conciliacao",
+"- **15 dias úteis**.\n- Conta da audiência de conciliação ou mediação (ou da última sessão), do protocolo do pedido de cancelamento da audiência pelo réu, ou, nos demais casos, da juntada da citação.\n- Toda a matéria de defesa deve vir na contestação, inclusive a reconvenção.",
+"CPC, arts. 335, 336 e 343");
 add("civel","Apelação","apelacao recurso sentenca prazo efeito suspensivo",
 "- Cabe contra **sentença**, em **15 dias úteis**.\n- Em regra tem efeito suspensivo; as exceções estão no art. 1.012, § 1º.\n- Questões não agraváveis decididas antes podem ser levantadas na apelação ou nas contrarrazões.",
 "CPC, arts. 1.009 e 1.012");
@@ -169,7 +172,7 @@ add("criminal","Habeas corpus","habeas corpus hc constrangimento ilegal liberdad
 add("criminal","Lei Maria da Penha","maria penha violencia domestica medida protetiva descumprimento",
 "- Medidas protetivas de urgência: afastamento do lar, proibição de contato e aproximação, entre outras.\n- Descumprir medida protetiva é crime.\n- Não se aplicam os benefícios da Lei 9.099/95 nem o princípio da insignificância.",
 "Lei 11.340/06, arts. 22 a 24-A e 41; Súmulas 536 e 589 do STJ");
-add("criminal","Drogas: uso e tráfico","drogas trafico uso porte maconha privilegiado quantidade",
+add("criminal","Drogas: uso e tráfico","drogas trafico uso porte maconha privilegiado quantidade pena traficante",
 "- **Uso** (art. 28): sem prisão; advertência, prestação de serviços ou medida educativa.\n- O STF (RE 635.659, 2024) entendeu que portar **maconha** para uso pessoal não é crime, presumindo uso até 40 g ou 6 plantas fêmeas.\n- **Tráfico** (art. 33): 5 a 15 anos; redução de 1/6 a 2/3 para primário, de bons antecedentes, que não se dedica ao crime nem integra organização (§ 4º).",
 "Lei 11.343/06, arts. 28 e 33; STF, RE 635.659");
 add("criminal","Revisão criminal","revisao criminal condenacao transito julgado erro prova nova",
@@ -242,15 +245,16 @@ const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/
 const PARADAS = new Set("a o e de da do das dos em no na nos nas um uma uns umas para por com sem que qual quais como quando onde quanto quantos e ou se ao aos as os meu minha sobre isso esse essa este esta tem ter ha pode posso deve devo sao foi ser fazer faz mais menos muito pra pro me te lhe".split(" "));
 const SIN = {demitido:"demissao", demitir:"demissao", mandado:"demissao", rescindir:"rescisao", recorrer:"recurso", recursos:"recurso", gravida:"gestante", gravidez:"gestante", inquilino:"despejo", aluguel:"despejo", heranca:"inventario", morreu:"inventario", liminar:"tutela", preso:"prisao", presa:"prisao", maconha:"drogas", trafico:"drogas", feriado:"prazo", vencimento:"prazo", contar:"contagem", conta:"contagem", hora:"horas", extra:"extras", pensao:"alimenticia", alimentos:"alimenticia", banco:"bancaria"};
 const tokens = s => norm(s).split(/\s+/).filter(t=>t && t.length>1 && !PARADAS.has(t)).map(t=>SIN[t]||t);
-const IDX = B.map(e=>({e, ch:new Set(tokens(e.chaves)), te:new Set(tokens(e.tema)), rp:norm(e.resp+" "+e.base)}));
+const stem = t => t.length>6 ? t.slice(0,6) : t;
+const IDX = B.map(e=>({e, ch:new Set(tokens(e.chaves).map(stem)), te:new Set(tokens(e.tema).map(stem)), rp:norm(e.resp+" "+e.base)}));
 P.BASE_DIREITO = B;
 P.buscarBase = function(q, area, max){
   const ts = tokens(q); if(!ts.length) return [];
   return IDX.filter(x=>!area || area==="todas" || x.e.area===area || x.e.area==="geral").map(x=>{
     let s = 0;
-    ts.forEach(t=>{ if(x.ch.has(t)) s += 3; else if([...x.ch].some(c=>c.length>4 && (c.startsWith(t) || t.startsWith(c)))) s += 2; if(x.te.has(t)) s += 2; if(t.length>3 && x.rp.includes(t)) s += 1; });
+    ts.forEach(t=>{ const st = stem(t); if(x.ch.has(st)) s += 3; else if(st.length>4 && [...x.ch].some(c=>c.length>4 && (c.startsWith(st) || st.startsWith(c)))) s += 2; if(x.te.has(st)) s += 2; if(st.length>3 && x.rp.includes(st)) s += 1; });
     return {e:x.e, s:s/Math.sqrt(ts.length)};
-  }).filter(r=>r.s>=1.5).sort((a,b)=>b.s-a.s).slice(0, max||3).map(r=>r.e);
+  }).filter(r=>r.s>=1.5).sort((a,b)=>b.s-a.s).filter((r,i,arr)=>r.s>=arr[0].s*0.6).slice(0, max||3).map(r=>r.e);
 };
 P.NOME_AREA_DIREITO = {trabalhista:"Trabalhista", civel:"Cível", criminal:"Criminal", geral:"Geral"};
 P.AVISO_BASE = "Base de consulta rápida do app, sem IA. Confira a redação vigente da lei e a jurisprudência atual antes de usar em peça ou orientação ao cliente.";
