@@ -47,7 +47,7 @@ const M = {arquivo:"", texto:"", itens:[], lado:"", destinatario:"", titulo:"", 
 const D = {area:"todas", dia:""};
 const L = {pane:"entrar", ferramenta:"", motivo:"", erro:"", carregando:true, entrando:false, chat:[], chatInput:"", chatOcupado:false,
   calc:{area:"civel", inicio:P.hoje(), dias:15, contagem:"auto", djen:true, suspende:true}, cnj:"", doc:null, docNome:"", docPergunta:"", docIA:null, docOcupado:false, docErro:"", papelPedido:"advogado", nomeEsc:""};
-const CH = {msgs:[], input:"", ocupado:false};
+const CH = {msgs:[], input:"", ocupado:false, pend:{}};
 const DG = {area:"todas", termo:"", aberto:"", juris:""};
 Object.assign(L, {tela:"entrar", token:"", convite:null, erroForm:"", msg:"", enviando:false, emailDigitado:""});
 S.convites = [];
@@ -235,14 +235,20 @@ function listaDaily(lateral){
   const chips = [["todas","Todas"],["trabalhista","Trabalhista"],["civel","Cível"],["criminal","Criminal"],["tribunais","Tribunais"]];
   let itens = ed ? (ed.itens||[]) : [];
   if(D.area!=="todas") itens = itens.filter(i=>i.area===D.area || (i.areas||[]).includes(D.area));
-  const item = i => { const tag = i.link ? "a" : "div"; return `<${tag} class="daily-item" ${i.link?`href="${esc(i.link)}" target="_blank" rel="noopener"`:""}><div class="src"><b>${esc(i.fonte||"")}</b>${i.area&&i.area!=="geral"?`<span class="chip ${i.area}">${i.area==="tribunais"?"Tribunais":AREAS[i.area]?.nome||esc(i.area)}</span>`:""}</div><b>${esc(i.titulo)}</b>${i.resumo?`<p>${esc(i.resumo)}</p>`:""}</${tag}>`; };
-  return `<div class="dh"><h2 style="font-size:1.1rem">Daily jurídico</h2><span class="small muted">${ed?esc(new Date(ed.id+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})):""}</span></div>
-    <div class="daily-chips">${chips.map(([k,l])=>`<button data-act="daily-area" data-a="${k}" aria-pressed="${D.area===k}">${l}</button>`).join("")}</div>
-    ${!ed?`<div class="empty small" style="padding:20px 6px"><p>As notícias do dia aparecem aqui todas as manhãs.</p></div>`:itens.length?itens.map(item).join(""):`<div class="empty small" style="padding:20px 6px"><p>Nenhuma notícia desta área hoje.</p></div>`}
+  const sigla = f => String(f||"?").replace(/[^A-Za-zÀ-ú ]/g," ").trim().split(/\s+/).filter(w=>w.length>2||/^[A-Z]{2,}$/.test(w)).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "§";
+  const quando = d => { if(!d) return ""; const t = Date.parse(d); if(isNaN(t)) return ""; const min = Math.round((Date.now()-t)/60000); return min<60 ? `há ${Math.max(min,1)} min` : min<1440 ? `há ${Math.round(min/60)} h` : new Date(t).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}); };
+  const item = i => { const tag = i.link ? "a" : "div"; const ar = i.area && i.area!=="geral" ? i.area : "";
+    const thumb = `<span class="thumb ${ar}"><span class="sg">${esc(sigla(i.fonte))}</span>${i.imagem?`<img src="${esc(i.imagem)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}</span>`;
+    return `<${tag} class="daily-item" ${i.link?`href="${esc(i.link)}" target="_blank" rel="noopener"`:""}>${thumb}
+      <span class="di-txt"><span class="src"><b>${esc(i.fonte||"")}</b>${ar?`<span class="chip ${ar}">${ar==="tribunais"?"Tribunais":AREAS[ar]?.nome||esc(ar)}</span>`:""}${quando(i.data)?`<span class="muted">${quando(i.data)}</span>`:""}</span>
+      <b class="di-tit">${esc(i.titulo)}</b>${i.resumo?`<span class="di-res">${esc(i.resumo)}</span>`:""}</span></${tag}>`; };
+  return `<div class="daily-head"><div class="dh"><h2 style="font-size:1.1rem">Daily jurídico</h2><span class="small muted">${ed?esc(new Date(ed.id+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})):""}${ed?` · ${itens.length} notícia(s)`:""}</span></div>
+    <div class="daily-chips">${chips.map(([k,l])=>`<button data-act="daily-area" data-a="${k}" aria-pressed="${D.area===k}">${l}</button>`).join("")}</div></div>
+    <div class="daily-list">
+    ${!ed?`<div class="empty small" style="padding:20px 6px"><p>Carregando as notícias do dia…</p></div>`:itens.length?itens.map(item).join(""):`<div class="empty small" style="padding:20px 6px"><p>Nenhuma notícia desta área hoje.</p></div>`}
     ${ed && !lateral && eds.length>1?`<label class="f" style="margin-top:8px">Edições anteriores<select id="daily-dia">${eds.map(e=>`<option value="${e.id}" ${e.id===ed.id?"selected":""}>${P.fmt(e.id)}</option>`).join("")}</select></label>`:""}
-    ${ed?`<p class="hint" style="padding:0 6px;margin:4px 0 0">Resumos curtos; a matéria completa abre no site de origem.</p>`:""}`;
+    ${ed?`<p class="hint" style="padding:0 6px;margin:4px 0 0">Resumos curtos; a matéria completa abre no site de origem.</p>`:""}</div>`;
 }
-
 /* ---------- ferramentas livres ---------- */
 const TJ = ["","AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SE","SP","TO"];
 function vFerramenta(){
@@ -590,7 +596,7 @@ function textoRespostaMinuta(){
 /* ---------- DAILY JURÍDICO ---------- */
 function vDaily(){
   return `<div class="head"><div><div class="eyebrow">${esc(new Date().toLocaleDateString("pt-BR",{weekday:"long", day:"numeric", month:"long"}))}</div><h1>Daily jurídico</h1><div class="sub">As principais notícias do Direito, separadas por área e atualizadas todas as manhãs.</div></div></div>
-  <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:6px">${listaDaily(false)}</div></div>`;
+  <div class="panel daily-box">${listaDaily(false)}</div>`;
 }
 
 /* ---------- ASSISTENTE (sem IA: lê os dados do escritório e a base de Direito) ---------- */
@@ -608,14 +614,14 @@ function chatHTML(o){
 }
 function vAssistente(){
   return chatHTML({msgs:CH.msgs, input:CH.input, idIn:"ch-in", bind:"CH.input", act:"ch", titulo:"Assistente do escritório",
-    sub:"Pergunte sobre processos, prazos, audiências e documentos cadastrados, ou tire uma dúvida jurídica geral.",
-    vazioTitulo:"Pergunte sobre a carteira", vazioTexto:`Consulta ${S.processos.length} processo(s), ${S.tarefas.filter(t=>!t.done).length} compromisso(s) pendente(s) e os documentos que você pode ver.`,
-    ph:"Ex.: Como está o processo da Maria? · Prazos desta semana",
-    sug:["Quais prazos vencem esta semana?","Próximas audiências","Documentos aguardando o cliente","Em que fase estão os processos trabalhistas?","Qual o prazo do recurso ordinário?"]});
+    sub:"Peça ações (cadastrar processo, cliente, prazo, audiência, andamento, relatórios, mensagens) ou pergunte sobre a carteira e dúvidas jurídicas.",
+    vazioTitulo:"O que você quer fazer?", vazioTexto:`Tenho acesso a ${S.processos.length} processo(s) e ${S.tarefas.filter(t=>!t.done).length} compromisso(s) pendente(s). Antes de gravar algo, mostro um resumo para você confirmar.`,
+    ph:"Ex.: Cadastre um processo de teste · Agende audiência dia 25/11 às 14h no processo da Maria",
+    sug:["Cadastre um processo de teste com dados gerais","Gere a pauta dos próximos 7 dias","Gere o relatório da carteira","Prazos desta semana","O que você consegue fazer?"]});
 }
 /* respostas da base de Direito, em HTML */
-function respostaBase(q, area){
-  const r = P.buscarBase(q, area, 3);
+function respostaBase(q, area, min){
+  const r = P.buscarBase(q, area, 3, min);
   if(!r.length) return "";
   return r.map((e,i)=>`<div class="kb${i?" kb-mais":""}"><div class="row" style="gap:8px;margin-bottom:4px"><b>${esc(e.tema)}</b>${e.area!=="geral"?`<span class="chip ${e.area}">${P.NOME_AREA_DIREITO[e.area]}</span>`:""}</div>${P.md(e.resp)}<div class="small muted" style="margin-top:6px">Fundamento: ${esc(e.base)}</div></div>`).join("")
     + `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">Ver julgados sobre "${esc(r[0].tema)}":</span>${["stj","tst","jusbrasil"].map(o=>`<button class="linkbtn small" data-act="juris" data-o="${o}" data-q="${esc(r[0].tema)}">${P.ONDE_PESQUISAR.find(x=>x[0]===o)[1]}</button>`).join("")}</div>`
@@ -630,14 +636,7 @@ function responderEscritorio(q){
   const n = nrm(q), h = hoje();
   const li = arr => `<ul style="margin:6px 0 0;padding-left:18px">${arr.join("")}</ul>`;
   const linhaT = t => { const p = procById(t.processo_id); const atras = !t.done && t.data<h; return `<li><b>${fmt(t.data)}</b>${t.hora?" "+esc(t.hora):""} · ${esc(t.tipo)}: ${esc(t.titulo||"")}${p?` <span class="muted">(${esc(nomeCliente(p))}${p.numero?" · "+esc(p.numero):""})</span>`:""}${t.atribuido_a?` <span class="muted">· ${esc(nomePerfil(t.atribuido_a))}</span>`:""}${atras?` <span class="chip danger">vencido</span>`:""}</li>`; };
-  // 1. processo citado pelo número ou pelo nome do cliente / parte
-  const dig = (q.match(/\d[\d.\-]{6,}/g)||[]).map(x=>x.replace(/\D/g,"")).filter(x=>x.length>=7);
-  let procs = dig.length ? S.processos.filter(p=>dig.some(d=>(p.numero||"").replace(/\D/g,"").includes(d))) : [];
-  if(!procs.length){
-    const palavras = n.split(/[^a-z0-9]+/).filter(w=>w.length>=4 && !["processo","processos","cliente","situacao","como","esta","qual","fase","andamento","prazo","prazos","sobre","caso"].includes(w));
-    const casa = nome => { const ws = nrm(nome).split(/[^a-z0-9]+/).filter(w=>w.length>=3); return ws.length && palavras.some(w=>ws.includes(w)); };
-    procs = S.processos.filter(p=>casa(nomeCliente(p)) || casa(p.parte_contraria));
-  }
+  const procs = encontrarProcessos(q);
   if(procs.length){
     return procs.slice(0,3).map(p=>{
       const ands = andamentosDe(p.id), docs = docsDe(p.id).filter(d=>["Rascunho","Aguardando cliente"].includes(d.status));
@@ -688,8 +687,10 @@ function responderEscritorio(q){
 function enviarChatEscritorio(q){
   q = String(q ?? CH.input).trim(); if(!q) return;
   CH.msgs.push({role:"user", content:q}); CH.input = "";
-  const html = responderEscritorio(q) || respostaBase(q) || semResposta(q);
-  CH.msgs.push({role:"assistant", html}); render();
+  let r = null;
+  try{ r = interpretarAcao(q); }catch(e){ console.error(e); r = {html:"Não consegui interpretar esse pedido. Tente com outras palavras ou veja <i>o que você consegue fazer?</i>"}; }
+  if(!r){ const h = responderEscritorio(q) || respostaBase(q, null, 2.5); r = {html: h || ajudaHTML("Não entendi bem esse pedido. Veja exemplos do que consigo fazer:")}; }
+  CH.msgs.push({role:"assistant", html:r.html, pendId:r.pendId||null}); render();
 }
 function enviarChatLivre(q){
   q = String(q ?? L.chatInput).trim(); if(!q) return;
@@ -697,6 +698,243 @@ function enviarChatLivre(q){
   L.chat.push({role:"assistant", html: respostaBase(q) || semResposta(q)});
   mostrarInicio(); $("#chat-fim")?.scrollIntoView({block:"end"});
 }
+/* ---------- ASSISTENTE: ações (cadastrar, agendar, relatórios) ---------- */
+const DELIM = /\s*(?:,|;|\.(?:\s|$)|\s+contra\s|\s+na\s|\s+no\s|\s+em\s|\s+dia\s|\s+para\s|\s+vara\b|\s+[áa]rea\b|\s+processo\b|\s+n[úu]mero\b|\s+com\s|\s+cpf\b|\s+cnpj\b|\s+telefone\b|\s+celular\b|\s+e-?mail\b|\s+às?\s|$)/i;
+const rotProc = p => (p.numero ? p.numero+" · " : "") + nomeCliente(p);
+const capitaliza = s => s.trim().replace(/\s+/g," ").split(" ").map(w=>/^(da|de|do|das|dos|e)$/i.test(w)?w.toLowerCase():w.charAt(0).toUpperCase()+w.slice(1)).join(" ");
+function trecho(q, re){ const m = q.match(re); if(!m) return ""; const resto = q.slice(m.index + m[0].length); const fim = resto.search(DELIM); return (fim>=0 ? resto.slice(0, fim) : resto).replace(/^["'“”]+|["'“”]+$/g,"").trim(); }
+function gerarCNJ(J, TR){
+  const N = String(Math.floor(1000000 + Math.random()*8999999)), A = String(new Date().getFullYear()), O = String(Math.floor(1 + Math.random()*9998)).padStart(4,"0");
+  const dv = String(98n - (BigInt(N + A + J + TR + O + "00") % 97n)).padStart(2,"0");
+  return `${N}-${dv}.${A}.${J}.${TR}.${O}`;
+}
+const DIAS_SEM = ["domingo","segunda","terca","quarta","quinta","sexta","sabado"];
+function lerData(q){
+  const n = nrm(q), hj = new Date(); hj.setHours(12,0,0,0);
+  if(/depois de amanha/.test(n)) return iso(addDays(hj,2));
+  if(/\bamanha\b/.test(n)) return iso(addDays(hj,1));
+  if(/\bhoje\b/.test(n)) return iso(hj);
+  let m = n.match(/(?:em|daqui a|daqui)\s+(\d{1,3})\s+dias?(?!\s*ute)/); if(m && !/prazo de/.test(n)) return iso(addDays(hj, Number(m[1])));
+  m = q.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+  if(m){ let a = m[3] ? Number(m[3]) : hj.getFullYear(); if(a<100) a += 2000; const d = new Date(a, Number(m[2])-1, Number(m[1]), 12); if(!m[3] && d < addDays(hj,-1)) d.setFullYear(a+1); if(!isNaN(d) && d.getDate()===Number(m[1])) return iso(d); }
+  m = n.match(/\bdia (\d{1,2})\b/); if(m){ const d = new Date(hj); d.setDate(Number(m[1])); if(d < hj) d.setMonth(d.getMonth()+1); return iso(d); }
+  for(let i=0;i<7;i++){ if(new RegExp("\\b(proxima |nesta |na |no )?"+DIAS_SEM[i]+"(-feira)?\\b").test(n)){ let d = addDays(hj,1); while(d.getDay()!==i) d = addDays(d,1); return iso(d); } }
+  return "";
+}
+function lerHora(q){ const m = q.match(/\b(?:às|as|a partir das)?\s*(\d{1,2})\s*(?:h|:)\s*(\d{2})?\b/i); if(!m) return ""; const h = Number(m[1]); if(h>23) return ""; return pad(h)+":"+(m[2]||"00"); }
+function lerPessoa(q){
+  const n = nrm(q); const eq = equipeAtiva();
+  const alvo = n.match(/(?:atribu\w*|responsavel|responsavel e|com|para (?:o |a )?(?:dr\.?|dra\.?)?)\s+(?:a |o |para )?([a-z]+)/);
+  const cand = eq.filter(u=>{ const pn = nrm(P.primeiroNome(u.nome)); return pn.length>=3 && new RegExp("\\b"+pn+"\\b").test(n); });
+  if(alvo){ const u = cand.find(u=>nrm(P.primeiroNome(u.nome))===alvo[1]); if(u) return u; }
+  return /\b(mim|me|eu)\b/.test(n) ? S.perfil : (cand[0] || null);
+}
+function encontrarProcessos(q){
+  const n = nrm(q);
+  const dig = (q.match(/\d[\d.\-]{6,}/g)||[]).map(x=>x.replace(/\D/g,"")).filter(x=>x.length>=7);
+  let procs = dig.length ? S.processos.filter(p=>dig.some(d=>(p.numero||"").replace(/\D/g,"").includes(d))) : [];
+  if(!procs.length){
+    const fora = ["processo","processos","cliente","clientes","situacao","como","esta","qual","fase","andamento","prazo","prazos","sobre","caso","relatorio","gerar","gere","mensagem","audiencia","documento","para","registre","registrar","cadastre","cadastrar","abrir","abra","novo","nova","criar","crie","teste","exemplo","dados","gerais","agende","agendar","marque","marcar","amanha","hoje","semana","concluir","conclua","pauta","carteira","atualizacao","enviar","envie"];
+    const palavras = n.split(/[^a-z0-9]+/).filter(w=>w.length>=4 && !fora.includes(w));
+    const casa = nome => { const ws = nrm(nome).split(/[^a-z0-9]+/).filter(w=>w.length>=3); return ws.length && palavras.some(w=>ws.includes(w)); };
+    procs = S.processos.filter(p=>casa(nomeCliente(p)) || casa(p.parte_contraria));
+  }
+  return procs;
+}
+const areaDoTexto = n => /trabalh|reclamat|clt\b|trt\b/.test(n) ? "trabalhista" : /crimin|penal|crime|inquerito|denuncia/.test(n) ? "criminal" : /civel|civil|consumidor|familia|cobranca|indeniza/.test(n) ? "civel" : "";
+
+const AJUDA_ACOES = [
+  ["Cadastrar processo","Cadastre um processo de teste com dados gerais"],
+  ["Cadastrar processo com dados","Novo processo trabalhista do cliente Maria Souza contra Mercado Bom Preço Ltda"],
+  ["Cadastrar cliente","Cadastre o cliente José Pereira, telefone 11 98888-7777"],
+  ["Agendar audiência","Agende audiência para 25/11 às 14h no processo da Maria"],
+  ["Criar prazo","Crie prazo de 15 dias úteis para contestação no processo da Maria"],
+  ["Registrar andamento","Registre andamento no processo da Maria: juntada de procuração"],
+  ["Relatório","Gere o relatório da carteira"],
+  ["Pauta em PDF","Gere a pauta dos próximos 7 dias"],
+  ["Mensagem ao cliente","Mensagem de atualização para o cliente do processo da Maria"],
+  ["Consultas","Prazos desta semana · Próximas audiências · Documentos aguardando o cliente"]
+];
+function ajudaHTML(intro){
+  return `<p>${intro||"Posso fazer ações no escritório e consultar seus dados. É só pedir com suas palavras:"}</p>
+    <div class="ajuda-acoes">${AJUDA_ACOES.map(([t,ex])=>`<button class="ajuda-item" data-act="ch-sug" data-q="${esc(ex.split(" · ")[0])}"><b>${t}</b><span>${esc(ex)}</span></button>`).join("")}</div>
+    <p class="small muted" style="margin-top:8px">Também respondo dúvidas jurídicas gerais (prazos, verbas, recursos, prisão…). Antes de gravar qualquer coisa, mostro um resumo para você confirmar.</p>`;
+}
+/* cartão de confirmação */
+function cartaoAcao(titulo, campos, extra){
+  return `<div class="acao-card"><div class="acao-t">${ICON.assistente}<b>${titulo}</b></div>
+    <dl class="acao-dl">${campos.filter(([,v])=>v).map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>${extra||""}</div>`;
+}
+function propor(acao, dados, titulo, campos, extra){
+  const id = "a"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  CH.pend[id] = {acao, dados};
+  return {pendId:id, html: cartaoAcao(titulo, campos, extra) + `<div class="row acao-bts" style="gap:8px;margin-top:10px"><button class="btn primary" data-act="ch-ok" data-k="${id}">Confirmar</button><button class="btn" data-act="ch-form" data-k="${id}">Ajustar no formulário</button><button class="btn ghost" data-act="ch-cancel" data-k="${id}">Cancelar</button></div>`};
+}
+function semPermissao(o){ return `Seu acesso não permite ${o}. Peça ao gestor em Equipe e acessos.`; }
+
+function interpretarAcao(q){
+  const n = nrm(q);
+  const verboCriar = /\b(cadastr|cri[ae]|criar|nov[oa]|inclu|adicion|registr|lanc|abr[ai]r? um|insir|insere|coloque|coloca)\w*/;
+  // ajuda
+  if(/^(ajuda|help|menu|oi|ola|e ai|bom dia|boa tarde|boa noite)\b|o que (voce|vc) (faz|sabe|pode)|como (funciona|te uso|usar)|nao entendi|^\?+$|comandos/.test(n)) return {html: ajudaHTML()};
+  // relatórios
+  if(/relatorio|\bpdf\b|imprim|exporta/.test(n) || /\b(ger[ae]r?|emit\w*|baix\w*|mont[ae]r?)\b.*\b(pauta|carteira|resumo)/.test(n)){
+    if(!pode("gerar_relatorios") && !pode("enviar_cliente")) return {html: semPermissao("gerar relatórios")};
+    const procs = /carteira|todos os processos|geral\b/.test(n) ? [] : encontrarProcessos(q);
+    if(procs.length===1){ const cli = /cliente|simples|enviar/.test(n); pdfProcesso(procs[0].id, cli); return {html:`Gerei o PDF ${cli?"do resumo para o cliente":"do relatório"} do processo <b>${esc(procs[0].numero||nomeCliente(procs[0]))}</b>. O download começou.`}; }
+    if(procs.length>1) return {html:`Encontrei ${procs.length} processos. Qual deles?<div class="pickchips" style="margin-top:8px">${procs.slice(0,6).map(p=>`<button data-act="pdf-processo" data-id="${p.id}">${esc(nomeCliente(p))} · ${esc(p.numero||AREAS[p.area]?.nome||"")}</button>`).join("")}</div>`};
+    if(/pauta|agenda|prazo|compromiss|semana|audienc/.test(n)){
+      const m = n.match(/(\d{1,3})\s*dias/); const dias = m ? Number(m[1]) : /semana/.test(n) ? 7 : /mes\b/.test(n) ? 30 : 15;
+      const resp = /minha|meus|minhas|para mim/.test(n) ? meuId() : "";
+      pdfPauta({dias, resp, venc:true}); return {html:`Gerei a pauta dos próximos <b>${dias} dias</b>${resp?" com os seus compromissos":" de toda a equipe"}, incluindo os vencidos. O download começou.`};
+    }
+    const area = areaDoTexto(n);
+    if(/carteira|processos|geral|todos|escritorio/.test(n) || area){ pdfCarteira({area}); return {html:`Gerei o relatório da carteira${area?" "+AREAS[area].nome.toLowerCase():""}. O download começou.`}; }
+    return {html:`Qual relatório você quer?<div class="pickchips" style="margin-top:8px"><button data-act="ch-sug" data-q="Gere o relatório da carteira">Carteira de processos</button><button data-act="ch-sug" data-q="Gere a pauta dos próximos 15 dias">Pauta dos próximos 15 dias</button><button data-act="nav" data-v="relatorios">Relatório de um processo</button></div>`};
+  }
+  // mensagem ao cliente
+  if(/mensagem|atualizac\w* (para|ao|pro)|whats|avis\w* (o|ao) cliente|e-?mail (para|ao) (o )?cliente/.test(n) && !verboCriar.test(n.replace(/mensagem.*/,""))){
+    if(!pode("enviar_cliente")) return {html: semPermissao("montar mensagens para clientes")};
+    const procs = encontrarProcessos(q);
+    if(procs.length===1){ abrirModal({kind:"comunicar", id:procs[0].id}); return {html:`Abri a mensagem pronta para <b>${esc(nomeCliente(procs[0]))}</b>. Revise e copie.`}; }
+    if(procs.length>1) return {html:`Para qual processo?<div class="pickchips" style="margin-top:8px">${procs.slice(0,6).map(p=>`<button data-act="comunicar" data-id="${p.id}">${esc(nomeCliente(p))} · ${esc(p.numero||"")}</button>`).join("")}</div>`};
+    return {html:`Diga o nome do cliente ou o número do processo. Ex.: <i>mensagem para o cliente do processo da Maria</i>.`};
+  }
+  // andamento
+  if(/andamento|movimenta/.test(n) && /(registr|anot|lanc|adicion|inclu|cri|nov|insir)/.test(n)){
+    if(!(pode("editar_processos")||pode("registrar_andamentos"))) return {html: semPermissao("registrar andamentos")};
+    const procs = encontrarProcessos(q.split(":")[0]); const texto = q.includes(":") ? q.slice(q.indexOf(":")+1).trim() : trecho(q, /andamento\s*(?:de|que|:)?\s*/i);
+    if(!procs.length) return {html:"Em qual processo? Diga o nome do cliente ou o número. Ex.: <i>registre andamento no processo da Maria: juntada de procuração</i>."};
+    if(procs.length>1) return {html:`Encontrei ${procs.length} processos com esse nome. Use o número do processo para eu saber qual.`};
+    if(!texto) return {html:"Qual é o texto do andamento? Escreva depois de dois-pontos. Ex.: <i>…: audiência redesignada</i>."};
+    const vis = !/interno|so a equipe|nao mostrar/.test(n), data = lerData(q.split(":")[0]) || hoje();
+    return propor("andamento", {processo_id:procs[0].id, texto, data, visivel_cliente:vis}, "Registrar andamento", [["Processo", rotProc(procs[0])],["Data", fmt(data)],["Texto", texto],["Cliente vê", vis?"Sim":"Não (interno)"]]);
+  }
+  // documento
+  if(/documento/.test(n) && verboCriar.test(n) && !/process/.test(n.replace(/no processo|do processo/,""))){
+    if(!(pode("editar_processos")||pode("registrar_andamentos"))) return {html: semPermissao("registrar documentos")};
+    const procs = encontrarProcessos(q.split(":")[0]); const nome = q.includes(":") ? q.slice(q.indexOf(":")+1).trim() : "";
+    if(procs.length!==1 || !nome) return {html:"Diga o processo e o nome do documento depois de dois-pontos. Ex.: <i>adicione documento no processo da Maria: procuração assinada</i>."};
+    return propor("documento", {processo_id:procs[0].id, nome, status:/assinad/.test(nrm(nome))?"Assinado":"Aguardando cliente"}, "Adicionar documento", [["Processo",rotProc(procs[0])],["Documento",nome]]);
+  }
+  // tarefa: prazo, audiência, reunião, diligência, peça
+  const tipoT = /audienc/.test(n) ? "Audiência" : /reuniao/.test(n) ? "Reunião" : /diligenc/.test(n) ? "Diligência" : /\bpeca\b|peticao|recurso|contestacao|minuta/.test(n) && !/prazo/.test(n) ? "Peça" : /prazo/.test(n) ? "Prazo" : /tarefa|lembrete|compromisso|atividade/.test(n) ? "Peça" : "";
+  if(tipoT && (verboCriar.test(n) || /\b(agend|marc|lembr)\w*/.test(n))){
+    if(!pode("criar_tarefas") && !/para mim|\bme\b/.test(n)) return {html: semPermissao("criar atividades para a equipe")+" Você pode criar para você mesmo: diga <i>para mim</i>."};
+    const procs = encontrarProcessos(q); const p = procs.length===1 ? procs[0] : null;
+    const area = p ? p.area : areaDoTexto(n);
+    let data = lerData(q), calculo = null, interno = null;
+    const mp = n.match(/prazo de (\d{1,3})\s*dias?\s*(uteis|corridos)?/) || n.match(/(\d{1,3})\s*dias?\s*(uteis|corridos)/);
+    if(tipoT==="Prazo" && mp){
+      const cont = mp[2] || (area ? AREAS[area].contagem : "uteis");
+      const mi = q.match(/(?:intima\w*|publica\w*|disponibiliza\w*)\s*(?:em|no dia|dia)?\s*(\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|hoje|ontem)/i);
+      let inicio = hoje(); if(mi){ inicio = /ontem/i.test(mi[1]) ? iso(addDays(new Date(),-1)) : (lerData(mi[1]) || hoje()); }
+      const djen = /disponibiliza|djen|diario/.test(n);
+      const r = P.calcPrazo({inicio, dias:Number(mp[1]), contagem:cont, djen, suspende:true});
+      if(r){ data = r.fatal; interno = P.prazoInterno(r.fatal); calculo = {inicio, dias:Number(mp[1]), djen, suspende:true, contagem:cont}; }
+    }
+    const hora = tipoT==="Audiência"||tipoT==="Reunião" ? lerHora(q) : "";
+    const pessoa = lerPessoa(q) || S.perfil;
+    let titulo = q.includes(":") ? q.slice(q.indexOf(":")+1).trim() : (trecho(q, /\bpara (?:a |o )?(?=contesta|apresenta|protocol|fazer|elabora|recurso|manifesta|juntar|réplica|replica|alega)/i) || "");
+    if(!titulo){ const t2 = n.match(/(contestacao|replica|recurso ordinario|recurso|apelacao|embargos|manifestacao|alegacoes finais|contrarrazoes|defesa|instrucao|conciliacao|julgamento|inicial)/); titulo = t2 ? capitaliza(t2[1].replace("contestacao","contestação").replace("replica","réplica").replace("apelacao","apelação").replace("manifestacao","manifestação").replace("alegacoes","alegações").replace("instrucao","instrução").replace("conciliacao","conciliação")) : ""; }
+    if(tipoT==="Audiência" && titulo && !/audi/i.test(titulo)) titulo = "Audiência de " + titulo.toLowerCase();
+    titulo = titulo ? titulo.charAt(0).toUpperCase()+titulo.slice(1) : tipoT;
+    const modalidade = tipoT==="Audiência" ? (/virtual|online|video|teams|zoom|meet/.test(n) ? "Virtual" : /hibrid/.test(n) ? "Híbrida" : "Presencial") : null;
+    const dados = {tipo:tipoT, titulo, processo_id:p?.id||null, data, hora:hora||null, interno, atribuido_a:pessoa?.id||meuId(), modalidade, calculo};
+    if(!data){ abrirModal({kind:"tarefa", tipo:tipoT, processo_id:p?.id||"", pre:{titulo, hora, atribuido_a:dados.atribuido_a}}); return {html:`Faltou a data. Abri o formulário de <b>${tipoT.toLowerCase()}</b> com o que entendi para você completar.`}; }
+    const aviso = procs.length>1 ? `<div class="small muted" style="margin-top:6px">Encontrei ${procs.length} processos com esse nome e deixei sem vínculo. Ajuste no formulário se quiser vincular.</div>` : (!p && /process/.test(n) ? `<div class="small muted" style="margin-top:6px">Não identifiquei o processo; ficará sem vínculo.</div>` : "");
+    return propor("tarefa", dados, "Nova atividade: "+tipoT, [["Descrição",titulo],["Processo",p?rotProc(p):""],["Data",fmt(data)+(hora?" às "+hora:"")],["Prazo interno",interno?fmt(interno):""],["Cálculo",calculo?`${calculo.dias} dia(s) ${calculo.contagem==="uteis"?"úteis":"corridos"} a partir de ${fmt(calculo.inicio)}`:""],["Modalidade",modalidade||""],["Responsável",pessoa?pessoa.nome:""]], aviso);
+  }
+  // processo
+  if(/process/.test(n) && verboCriar.test(n)){
+    if(!pode("editar_processos")) return {html: semPermissao("cadastrar processos")};
+    const exemplo = /teste|exemplo|ficticio|generico|dados gerais|qualquer|aleatori|simulad|demonstra/.test(n);
+    const numero = (q.match(/\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}/)||[""])[0];
+    const info = numero ? P.cnjInfo(numero) : null;
+    let area = areaDoTexto(n) || (info && info.J==="5" ? "trabalhista" : info && info.J==="8" ? "civel" : "");
+    let cliente = capitaliza(trecho(q, /\b(?:do |da |para o |para a |pro )?cliente\s+(?:é\s+|chamad[oa]\s+)?/i) || "");
+    let contra = capitaliza(trecho(q, /\bcontra\s+(?:o |a |os |as )?/i) || "");
+    const vara = (q.match(/\b(\d{1,3}\s*[ªaº°]?\s*vara[^,;]*)/i)||["",""])[1].trim();
+    const valor = (q.match(/r\$\s*[\d.,]+(?:\s*mil)?/i)||[""])[0];
+    let resumo = "", fase = FASES[0];
+    if(exemplo){
+      area = area || "trabalhista";
+      cliente = cliente || "Cliente Teste (exemplo)";
+      contra = contra || (area==="trabalhista" ? "Empresa Exemplo Ltda." : area==="criminal" ? "Ministério Público" : "Banco Exemplo S.A.");
+      resumo = "Processo fictício criado pelo assistente para teste. Pode excluir quando quiser.";
+    }
+    const num = numero ? (info.valido ? info.formatado : numero) : (exemplo ? gerarCNJ(area==="trabalhista"?"5":"8", area==="trabalhista"?"02":"26") : "");
+    const varaF = vara || (exemplo ? (area==="trabalhista" ? "1ª Vara do Trabalho de São Paulo" : area==="criminal" ? "1ª Vara Criminal de São Paulo" : "1ª Vara Cível de São Paulo") : "");
+    if(!area || !cliente){
+      abrirModal({kind:"processo", pre:{numero:num, area, parte_contraria:contra, vara:varaF, valor, cliente_id:(S.clientes.find(c=>nrm(c.nome)===nrm(cliente))||{}).id||""}});
+      return {html:`Abri o formulário de novo processo com o que entendi. ${!area?"Falta a <b>área</b>. ":""}${!cliente?"Falta o <b>cliente</b>. ":""}<br><span class="small muted">Dica: diga <i>cadastre um processo de teste</i> para eu preencher tudo com dados fictícios.</span>`};
+    }
+    const existente = S.clientes.find(c=>nrm(c.nome)===nrm(cliente));
+    if(!existente && !pode("gerenciar_clientes")) return {html: semPermissao("cadastrar clientes novos")+` O cliente "${esc(cliente)}" ainda não existe.`};
+    const dados = {processo:{numero:num, area, fase, polo:area==="criminal"?"Acusado":"Autor / reclamante", parte_contraria:contra, vara:varaF, valor:valor||(exemplo?"R$ 50.000,00":""), resumo, resumo_cliente:exemplo?"Processo de teste.":"", responsavel_id:meuId()}, cliente, cliente_id:existente?.id||null, exemplo};
+    return propor("processo", dados, exemplo?"Novo processo de teste":"Novo processo", [["Número",num||"(sem número)"],["Área",AREAS[area].nome],["Cliente",cliente+(existente?"":" (novo cadastro)")],["Parte contrária",contra],["Vara",varaF],["Valor",dados.processo.valor],["Fase",fase]],
+      exemplo?`<div class="small muted" style="margin-top:6px">Também vou criar um andamento e um prazo de contestação (15 dias) para você testar agenda, relatórios e mensagens.</div>`:"");
+  }
+  // cliente
+  if(/cliente/.test(n) && verboCriar.test(n)){
+    if(!pode("gerenciar_clientes")) return {html: semPermissao("cadastrar clientes")};
+    const nome = capitaliza(trecho(q, /\bcliente\s+(?:chamad[oa]\s+|novo\s+|nova\s+)?/i) || "");
+    if(!nome){ abrirModal({kind:"cliente"}); return {html:"Abri o cadastro de cliente para você preencher."}; }
+    const docm = q.match(/\b(\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/);
+    const tel = (q.match(/(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/)||[""])[0];
+    const email = (q.match(/[\w.+-]+@[\w-]+\.[\w.]+/)||[""])[0];
+    const doc = docm ? docm[1] : "", tipo = doc.replace(/\D/g,"").length===14 || /ltda|s\.?a\.?|eireli|\bme\b|empresa/i.test(nome) ? "PJ" : "PF";
+    if(S.clientes.some(c=>nrm(c.nome)===nrm(nome))) return {html:`Já existe um cliente chamado <b>${esc(nome)}</b>.`};
+    return propor("cliente", {nome, tipo, doc, telefone:tel.replace(doc,""), email}, "Novo cliente", [["Nome",nome],["Tipo",tipo==="PJ"?"Pessoa jurídica":"Pessoa física"],["CPF/CNPJ",doc],["Telefone",tel],["E-mail",email]]);
+  }
+  // concluir
+  if(/\b(conclu|finaliz|marc\w* como feit|dar baixa|baixar|feito)\w*/.test(n) && !/relatorio/.test(n)){
+    const ws = n.split(/[^a-z0-9]+/).filter(w=>w.length>=4 && !["concluir","conclua","concluido","finalizar","marcar","como","feito","feita","tarefa","prazo","baixa"].includes(w));
+    const cand = S.tarefas.filter(t=>!t.done && ws.some(w=>nrm((t.titulo||"")+" "+nomeCliente(procById(t.processo_id))).includes(w)));
+    if(cand.length===1){ const t = cand[0]; return propor("concluir", {id:t.id}, "Concluir atividade", [["Atividade",t.titulo],["Tipo",t.tipo],["Data",fmt(t.data)]]); }
+    if(cand.length>1) return {html:`Qual delas?<div class="pickchips" style="margin-top:8px">${cand.slice(0,6).map(t=>`<button data-act="editar-tarefa" data-id="${t.id}">${esc(t.titulo)} · ${fmt(t.data)}</button>`).join("")}</div>`};
+  }
+  return null;
+}
+async function executarAcao(id, op){
+  const pd = CH.pend[id]; if(!pd) return;
+  const msg = CH.msgs.find(m=>m.pendId===id);
+  const fim = html => { if(msg){ msg.html = html; msg.pendId = null; } delete CH.pend[id]; render(); };
+  const d = pd.dados;
+  if(op==="cancel") return fim(`<span class="muted">Ação cancelada.</span>`);
+  if(op==="form"){
+    delete CH.pend[id]; if(msg){ msg.html += `<div class="small muted" style="margin-top:6px">Abri no formulário para ajuste.</div>`; msg.html = msg.html.replace(/<div class="row acao-bts"[\s\S]*?<\/div>/,""); msg.pendId = null; }
+    if(pd.acao==="processo") abrirModal({kind:"processo", pre:Object.assign({}, d.processo, {cliente_id:d.cliente_id||""})});
+    else if(pd.acao==="tarefa") abrirModal({kind:"tarefa", tipo:d.tipo, processo_id:d.processo_id||"", pre:Object.assign({}, d, d.calculo?{inicio:d.calculo.inicio, dias:d.calculo.dias, djen:d.calculo.djen, contagem:d.calculo.contagem}:{} )});
+    else if(pd.acao==="cliente") abrirModal({kind:"cliente"});
+    else if(pd.acao==="andamento"||pd.acao==="documento") abrirModal({kind:"detalhe", id:d.processo_id, vivo:true, aba:"andamentos"});
+    else if(pd.acao==="concluir") abrirModal({kind:"tarefa", id:d.id});
+    render(); return;
+  }
+  const btn = document.querySelector(`[data-act="ch-ok"][data-k="${id}"]`); if(btn){ btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`; }
+  const esc_id = S.escritorio.id;
+  try{
+    if(pd.acao==="processo"){
+      let cli = d.cliente_id;
+      if(!cli){ const c = await api.inserir("clientes", {escritorio_id:esc_id, nome:d.cliente, tipo:/ltda|s\.a\.|eireli/i.test(d.cliente)?"PJ":"PF", obs:d.exemplo?"Cliente fictício criado para teste.":null}); cli = c.id; await recarregar("clientes", true); }
+      const r = await api.inserir("processos", Object.assign({escritorio_id:esc_id, cliente_id:cli}, d.processo));
+      if(d.exemplo){
+        await api.inserir("andamentos", {escritorio_id:esc_id, processo_id:r.id, data:hoje(), texto:"Processo cadastrado para teste pelo assistente.", visivel_cliente:true});
+        const c = P.calcPrazo({inicio:hoje(), dias:15, contagem:AREAS[d.processo.area].contagem, djen:false, suspende:true});
+        if(c && (pode("criar_tarefas"))) await api.inserir("tarefas", {escritorio_id:esc_id, processo_id:r.id, tipo:"Prazo", titulo:"Contestação (teste)", data:c.fatal, interno:P.prazoInterno(c.fatal), atribuido_a:meuId(), done:false, calculo:{inicio:hoje(), dias:15, djen:false, suspende:true, contagem:"auto"}});
+        await Promise.all(["andamentos","tarefas"].map(t=>recarregar(t,true)));
+      }
+      await recarregar("processos", true);
+      return fim(`✓ Processo <b>${esc(d.processo.numero||"")}</b> cadastrado para <b>${esc(d.cliente)}</b>.${d.exemplo?" Criei também um andamento e o prazo de contestação.":""} <button class="linkbtn" data-act="abrir-processo" data-id="${r.id}">Abrir processo</button>`);
+    }
+    if(pd.acao==="cliente"){ const r = await api.inserir("clientes", Object.assign({escritorio_id:esc_id}, d)); await recarregar("clientes", true); return fim(`✓ Cliente <b>${esc(d.nome)}</b> cadastrado. <button class="linkbtn" data-act="editar-cliente" data-id="${r.id}">Abrir cadastro</button>`); }
+    if(pd.acao==="tarefa"){ const row = {tipo:d.tipo, titulo:d.titulo, processo_id:d.processo_id, data:d.data, interno:d.interno, hora:d.hora, modalidade:d.modalidade, atribuido_a:d.atribuido_a, calculo:d.calculo, done:false, escritorio_id:esc_id}; const r = await api.inserir("tarefas", row); await recarregar("tarefas", true); return fim(`✓ Agendado: <b>${esc(d.titulo)}</b> (${esc(d.tipo.toLowerCase())}) em <b>${fmt(d.data)}${d.hora?" às "+esc(d.hora):""}</b>. <button class="linkbtn" data-act="editar-tarefa" data-id="${r.id}">Abrir</button>`); }
+    if(pd.acao==="andamento"){ await api.inserir("andamentos", Object.assign({escritorio_id:esc_id}, d)); await recarregar("andamentos", true); return fim(`✓ Andamento registrado. <button class="linkbtn" data-act="abrir-processo" data-id="${d.processo_id}">Abrir processo</button>`); }
+    if(pd.acao==="documento"){ await api.inserir("documentos", Object.assign({escritorio_id:esc_id, data:hoje(), visivel_cliente:false}, d)); await recarregar("documentos", true); return fim(`✓ Documento <b>${esc(d.nome)}</b> adicionado.`); }
+    if(pd.acao==="concluir"){ await api.atualizar("tarefas", d.id, {done:true, concluido_em:new Date().toISOString()}); await recarregar("tarefas", true); return fim(`✓ Atividade concluída.`); }
+  }catch(e){ if(btn){ btn.disabled = false; btn.textContent = "Confirmar"; } toast(P.erroAmigavel(e)); }
+}
+
 /* ---------- DIREITO GERAL ---------- */
 function listaTemas(){
   const t = DG.termo.trim();
@@ -712,12 +950,12 @@ function vDireito(voltar){
   return `<div class="head"><div><h1>Direito geral</h1><div class="sub">Temas do dia a dia com prazo e fundamento, súmulas de consulta frequente, pesquisa de jurisprudência nos tribunais e acesso às leis.</div></div>${voltar||""}</div>
   <div class="tabs" role="tablist"><span class="ind"></span>${areas.map(([k,l])=>`<button role="tab" aria-selected="${DG.area===k}" data-act="dg-area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}</button>`).join("")}</div>
   <div class="dg-grid">
-    <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
+    <div class="panel dg-col"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
       <h2 style="font-size:1.05rem;margin:0">Temas e regras</h2>
       <div class="search" style="margin:0">${ICON.search}<input type="search" id="dg-busca" value="${esc(DG.termo)}" placeholder="Buscar tema: prazo apelação, verbas, fiança…" autocomplete="off"></div>
       <div id="dg-lista" class="temas">${listaTemas()}</div>
       <div class="hint">${esc(P.AVISO_BASE)}</div></div></div>
-    <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+    <div class="dg-col" style="display:flex;flex-direction:column;gap:16px;min-width:0">
       <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
         <h2 style="font-size:1.05rem;margin:0">Pesquisar jurisprudência</h2>
         <label class="f">Tema ou palavras-chave<input type="text" id="jp-termo" value="${esc(DG.juris)}" placeholder="Ex.: dano moral atraso voo"></label>
@@ -776,7 +1014,7 @@ function vEquipe(){
   <div class="panel"><div class="panel-h"><h2>Links de convite</h2><span class="small muted">${pend.length} aguardando uso</span></div>
     ${convs.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Para</th><th>Função</th><th>Situação</th><th>Validade</th><th></th></tr></thead><tbody>
     ${convs.map(c=>{ const [st,cl] = situacaoConvite(c); return `<tr style="cursor:default"><td><b style="font-weight:600">${esc(c.nome||"Sem nome")}</b><div class="small muted">${esc(c.email||"qualquer e-mail")}${c.cliente_id?" · cliente "+esc(cliById(c.cliente_id)?.nome||""):""}</div></td>
-      <td><span class="chip neutral">${esc(P.PAPEIS[c.papel]||"")}</span></td><td><span class="chip ${cl}">${st}</span></td><td class="small">${c.expira_em?P.fmt(c.expira_em.slice(0,10)):"—"}</td>
+      <td><span class="chip neutral">${esc(P.PAPEIS[c.papel]||"")}</span></td><td><span class="chip ${cl}">${st}</span></td><td class="small">${c.expira_em?P.fmt(c.expira_em.slice(0,10)):"Sem prazo"}</td>
       <td style="text-align:right;white-space:nowrap">${st==="Aguardando"?`<button class="btn ghost" data-act="copiar-convite" data-id="${c.id}">${ICON.copy}Copiar link</button>`:""}<button class="btn ghost" data-act="excluir-convite" data-id="${c.id}">${st==="Aguardando"?"Cancelar":"Remover"}</button></td></tr>`; }).join("")}
     </tbody></table></div>`:`<div class="empty small"><p>Nenhum convite ainda. Crie um link para cada pessoa da equipe ou cliente.</p></div>`}</div>
   <div class="panel"><div class="panel-h"><h2>Equipe</h2><span class="small muted">${equipe.length} pessoa(s)</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pessoa</th><th>Função</th><th>Situação</th><th>Acessos</th></tr></thead><tbody>
@@ -794,7 +1032,7 @@ function vEquipe(){
 function mConvite(m){
   const c = m.c || (m.c = Object.assign({nome:"", email:"", papel:"advogado", cliente_id:"", dias:7, permissoes:Object.assign({}, P.PADRAO.advogado)}, m.pre||{}));
   if(c.link) return cab("Link criado", esc(c.nome||"")) + `<div class="sheet-b">
-    <div class="notice"><b>Envie este link para ${esc(c.nome||"a pessoa")}.</b> Ele vale até ${P.fmt(c.expira_em.slice(0,10))}, pode ser usado uma única vez${c.email?` e só com o e-mail <b>${esc(c.email)}</b>`:""}.</div>
+    <div class="notice"><b>Envie este link para ${esc(c.nome||"a pessoa")}.</b> Ele ${c.expira_em?`vale até ${P.fmt(c.expira_em.slice(0,10))}`:"não expira"}, pode ser usado uma única vez${c.email?` e só com o e-mail <b>${esc(c.email)}</b>`:""}.</div>
     <label class="f">Link de acesso<input type="text" readonly value="${esc(c.link)}" class="mono" onfocus="this.select()"></label>
     <label class="f">Mensagem pronta<textarea id="cv-msg" rows="7">${esc(textoConvite(c))}</textarea></label>
   </div><div class="sheet-f"><button class="btn" data-act="fechar">Fechar</button><button class="btn" data-act="copiar-txt" data-t="${esc(c.link)}">${ICON.copy}Copiar link</button><button class="btn primary" data-act="copiar-msg-convite">${ICON.copy}Copiar mensagem</button></div>`;
@@ -803,7 +1041,7 @@ function mConvite(m){
     <div class="grid2"><label class="f">Nome da pessoa<input type="text" id="cv-n" value="${esc(c.nome)}" placeholder="Ex.: Júlia Prado"></label>
       <label class="f">E-mail (recomendado)<input type="email" id="cv-e" value="${esc(c.email)}" placeholder="O link só funciona com este e-mail"></label>
       <label class="f">Função<select id="cv-p">${opts([["advogado","Advogado(a)"],["estagiario","Estagiário(a)"],["gestor","Gestor"],["cliente","Cliente"]], c.papel)}</select></label>
-      <label class="f">Validade do link<select id="cv-d">${opts([["1","1 dia"],["7","7 dias"],["30","30 dias"]], String(c.dias))}</select></label>
+      <label class="f">Validade do link<select id="cv-d">${opts([["1","1 dia"],["7","7 dias"],["30","30 dias"],["90","90 dias"],["0","Sem prazo"]], String(c.dias))}</select><span class="hint">Prazo só para usar o link. Depois de criar a conta, o acesso fica liberado sem prazo, até você suspender.</span></label>
       ${c.papel==="cliente"?`<label class="f span2">Cliente (ele verá só os processos deste cliente)<select id="cv-cli"><option value="">Selecione</option>${opts(S.clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(x=>[x.id,x.nome]), c.cliente_id)}</select></label>`:""}</div>
     ${c.papel==="gestor"?`<div class="notice">O gestor tem acesso total, inclusive para criar convites e mudar acessos.</div>`
     :`<div class="row" style="justify-content:space-between"><h3>O que pode ver e fazer</h3><button class="linkbtn" data-act="convite-padrao">Padrão da função</button></div>
@@ -812,7 +1050,7 @@ function mConvite(m){
   </div><div class="sheet-f"><button class="btn" data-act="fechar">Cancelar</button><button class="btn primary" data-act="salvar-convite">Gerar link</button></div>`;
 }
 function lerConviteForm(){ const c = modal.c; c.nome = $("#cv-n").value.trim(); c.email = $("#cv-e").value.trim(); c.papel = $("#cv-p").value; c.dias = Number($("#cv-d").value); const cl = $("#cv-cli"); if(cl) c.cliente_id = cl.value; const pm = Object.assign({}, c.permissoes); document.querySelectorAll("[data-cperm]").forEach(x=>pm[x.dataset.cperm] = x.checked); c.permissoes = pm; return c; }
-function textoConvite(c){ return `Olá${c.nome?", "+P.primeiroNome(c.nome):""}! Você foi convidado(a) para acessar ${c.papel==="cliente"?"o acompanhamento dos seus processos com":"a área da equipe do"} ${S.escritorio?.nome||"escritório"}.\n\n1. Abra o link: ${c.link}\n2. Confira seu nome${c.email?" e use o e-mail "+c.email:""}\n3. Crie sua senha\n\nO link vale até ${P.fmt((c.expira_em||"").slice(0,10))} e pode ser usado uma vez. Depois disso, é só entrar pelo mesmo endereço com e-mail e senha.`; }
+function textoConvite(c){ return `Olá${c.nome?", "+P.primeiroNome(c.nome):""}! Você foi convidado(a) para acessar ${c.papel==="cliente"?"o acompanhamento dos seus processos com":"a área da equipe do"} ${S.escritorio?.nome||"escritório"}.\n\n1. Abra o link: ${c.link}\n2. Confira seu nome${c.email?" e use o e-mail "+c.email:""}\n3. Crie sua senha\n\n${c.expira_em?`O link vale até ${P.fmt(c.expira_em.slice(0,10))} e pode ser usado uma vez.`:"O link pode ser usado uma vez."} Depois disso, é só entrar pelo mesmo endereço com e-mail e senha.`; }
 function mCliente(m){
   const c = m.c || (m.c = m.id ? Object.assign({}, cliById(m.id)) : {tipo:"PF"});
   const ps = m.id ? S.processos.filter(p=>p.cliente_id===m.id) : [];
@@ -1107,9 +1345,9 @@ function pdfPortal(pid){
   if((p.andamentos||[]).length){ P.pdfTitulo(ctx,"Movimentações"); P.pdfTabela(ctx, ["Data","Andamento"], p.andamentos.map(a=>[fmt(a.data), a.texto]), {colunas:{0:{cellWidth:70}}}); }
   P.pdfSalvar(ctx, `Resumo ${P.soDigitos(p.numero)||"processo"}.pdf`);
 }
-function pdfPauta(){
-  if(!exigePdf()) return;
-  const dias = Number($("#r-per").value), resp = $("#r-resp").value, venc = $("#r-venc").checked, h = hoje(), ate = iso(addDays(new Date(), dias));
+function pdfPauta(o){
+  if(!exigePdf()) return; o = o || {};
+  const dias = Number(o.dias ?? $("#r-per")?.value ?? 15), resp = o.resp ?? $("#r-resp")?.value ?? "", venc = o.venc ?? $("#r-venc")?.checked ?? true, h = hoje(), ate = iso(addDays(new Date(), dias));
   let ts = S.tarefas.filter(t=>!t.done && t.data && (resp? t.atribuido_a===resp : true));
   const vencidos = ts.filter(t=>t.data<h), periodo = ts.filter(t=>t.data>=h && t.data<=ate).sort((a,b)=>(a.data+(a.hora||"")).localeCompare(b.data+(b.hora||"")));
   const ctx = P.pdfNovo("Pauta do escritório", `${fmt(h)} a ${fmt(ate)}${resp?" · "+nomePerfil(resp):" · toda a equipe"}`);
@@ -1119,9 +1357,9 @@ function pdfPauta(){
   if(periodo.length) P.pdfTabela(ctx, ["Data","Tipo","Descrição","Processo / cliente","Resp.","Interno"], periodo.map(linha)); else P.pdfTexto(ctx, "Nenhum compromisso no período.");
   P.pdfSalvar(ctx, `Pauta ${h}.pdf`);
 }
-function pdfCarteira(){
-  if(!exigePdf()) return;
-  const area = $("#r-area").value;
+function pdfCarteira(o){
+  if(!exigePdf()) return; o = o || {};
+  const area = o.area ?? $("#r-area")?.value ?? "";
   const ps = S.processos.filter(p=>!area || p.area===area).sort((a,b)=>(a.area+a.fase).localeCompare(b.area+b.fase));
   const ctx = P.pdfNovo("Carteira de processos", (area?AREAS[area].nome:"Todas as áreas")+` · ${ps.length} processo(s)`);
   const porFase = {}; ps.forEach(p=>porFase[p.fase||"—"]=(porFase[p.fase||"—"]||0)+1);
@@ -1221,11 +1459,11 @@ document.addEventListener("click", async e => {
     case "sync-portais": sincronizarTodos(); toast("Portais atualizados"); break;
     /* equipe */
     case "novo-convite": abrirModal({kind:"convite"}); break;
-    case "convite-cliente": { const c = cliById(id); abrirModal({kind:"convite", pre:{nome:c.nome, email:c.email||"", papel:"cliente", cliente_id:id, permissoes:Object.assign({}, P.PADRAO.cliente)}}); break; }
+    case "convite-cliente": { const c = cliById(id); abrirModal({kind:"convite", pre:{nome:c.nome, email:c.email||"", papel:"cliente", cliente_id:id, dias:0, permissoes:Object.assign({}, P.PADRAO.cliente)}}); break; }
     case "convite-padrao": lerConviteForm(); modal.c.permissoes = Object.assign({}, P.PADRAO[modal.c.papel]); abrirModal(modal); break;
     case "salvar-convite": { const c = lerConviteForm(); if(!c.nome){ toast("Informe o nome da pessoa."); return; } if(c.papel==="cliente" && !c.cliente_id){ toast("Escolha o cliente."); return; }
       el.disabled = true;
-      await comErro(async()=>{ const r = await api.inserir("convites", {nome:c.nome, email:c.email||null, papel:c.papel, permissoes:c.papel==="gestor"?P.PADRAO.gestor:c.permissoes, cliente_id:c.papel==="cliente"?c.cliente_id:null, expira_em:P.addDays(new Date(), c.dias).toISOString()});
+      await comErro(async()=>{ const r = await api.inserir("convites", {nome:c.nome, email:c.email||null, papel:c.papel, permissoes:c.papel==="gestor"?P.PADRAO.gestor:c.permissoes, cliente_id:c.papel==="cliente"?c.cliente_id:null, expira_em:c.dias>0 ? P.addDays(new Date(), c.dias).toISOString() : null});
         c.token = r.token; c.expira_em = r.expira_em; c.link = linkConvite(r); abrirModal(modal); agendarRecarga("convites"); });
       el.disabled = false; break; }
     case "copiar-convite": { const c = S.convites.find(x=>x.id===id); P.copiar(linkConvite(c)); break; }
@@ -1255,6 +1493,9 @@ document.addEventListener("click", async e => {
     case "pdf-processo-sel": pdfProcesso($("#r-proc").value, $("#r-cli").checked); break;
     case "pdf-pauta": pdfPauta(); break;
     case "pdf-carteira": pdfCarteira(); break;
+    case "ch-ok": executarAcao(el.dataset.k, "ok"); break;
+    case "ch-form": executarAcao(el.dataset.k, "form"); break;
+    case "ch-cancel": executarAcao(el.dataset.k, "cancel"); break;
     case "pdf-portal": pdfPortal(id); break;
     case "pdf-minuta": salvarCamposMinuta(); pdfMinuta(); break;
     /* leitor */

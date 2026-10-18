@@ -242,19 +242,19 @@ P.ONDE_PESQUISAR = [
 
 /* ---------------- BUSCA NA BASE ---------------- */
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9§ ]+/g," ");
-const PARADAS = new Set("a o e de da do das dos em no na nos nas um uma uns umas para por com sem que qual quais como quando onde quanto quantos e ou se ao aos as os meu minha sobre isso esse essa este esta tem ter ha pode posso deve devo sao foi ser fazer faz mais menos muito pra pro me te lhe".split(" "));
+const PARADAS = new Set("a o e de da do das dos em no na nos nas um uma uns umas para por com sem que qual quais como quando onde quanto quantos e ou se ao aos as os meu minha sobre isso esse essa este esta tem ter ha pode posso deve devo sao foi ser fazer faz mais menos muito pra pro me te lhe nao sim entendi entender entendo processo processos dados gerais geral teste favor quero gostaria preciso voce vc mim eu ele ela isso aqui ok obrigado obrigada cadastre cadastrar crie criar gere gerar".split(" "));
 const SIN = {demitido:"demissao", demitir:"demissao", mandado:"demissao", rescindir:"rescisao", recorrer:"recurso", recursos:"recurso", gravida:"gestante", gravidez:"gestante", inquilino:"despejo", aluguel:"despejo", heranca:"inventario", morreu:"inventario", liminar:"tutela", preso:"prisao", presa:"prisao", maconha:"drogas", trafico:"drogas", feriado:"prazo", vencimento:"prazo", contar:"contagem", conta:"contagem", hora:"horas", extra:"extras", pensao:"alimenticia", alimentos:"alimenticia", banco:"bancaria"};
 const tokens = s => norm(s).split(/\s+/).filter(t=>t && t.length>1 && !PARADAS.has(t)).map(t=>SIN[t]||t);
 const stem = t => t.length>6 ? t.slice(0,6) : t;
 const IDX = B.map(e=>({e, ch:new Set(tokens(e.chaves).map(stem)), te:new Set(tokens(e.tema).map(stem)), rp:norm(e.resp+" "+e.base)}));
 P.BASE_DIREITO = B;
-P.buscarBase = function(q, area, max){
+P.buscarBase = function(q, area, max, min){
   const ts = tokens(q); if(!ts.length) return [];
   return IDX.filter(x=>!area || area==="todas" || x.e.area===area || x.e.area==="geral").map(x=>{
     let s = 0;
     ts.forEach(t=>{ const st = stem(t); if(x.ch.has(st)) s += 3; else if(st.length>4 && [...x.ch].some(c=>c.length>4 && (c.startsWith(st) || st.startsWith(c)))) s += 2; if(x.te.has(st)) s += 2; if(st.length>3 && x.rp.includes(st)) s += 1; });
     return {e:x.e, s:s/Math.sqrt(ts.length)};
-  }).filter(r=>r.s>=1.5).sort((a,b)=>b.s-a.s).filter((r,i,arr)=>r.s>=arr[0].s*0.6).slice(0, max||3).map(r=>r.e);
+  }).filter(r=>r.s>=(min||1.5)).sort((a,b)=>b.s-a.s).filter((r,i,arr)=>r.s>=arr[0].s*0.6).slice(0, max||3).map(r=>r.e);
 };
 P.NOME_AREA_DIREITO = {trabalhista:"Trabalhista", civel:"Cível", criminal:"Criminal", geral:"Geral"};
 P.AVISO_BASE = "Base de consulta rápida do app, sem IA. Confira a redação vigente da lei e a jurisprudência atual antes de usar em peça ou orientação ao cliente.";

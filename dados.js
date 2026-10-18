@@ -26,7 +26,7 @@ P.erroAmigavel = function(e){
 };
 
 function edicao(d){
-  return {id:P.hoje(), geradoEm:d.geradoEm, fontes:d.fontes||[], itens:(d.itens||[]).map(i=>({titulo:i.titulo, resumo:i.resumo, fonte:i.fonte, link:i.link, data:i.data, areas:i.areas||[], area:(i.areas||[])[0]||"geral"}))};
+  return {id:P.hoje(), geradoEm:d.geradoEm, fontes:d.fontes||[], itens:(d.itens||[]).map(i=>({titulo:i.titulo, resumo:i.resumo, fonte:i.fonte, link:i.link, data:i.data, areas:i.areas||[], area:(i.areas||[])[0]||"geral", imagem:i.imagem||""}))};
 }
 
 /* ================= Supabase ================= */
@@ -141,7 +141,7 @@ P.criarDemo = function(){
     async sair(){ me = null; api.eu = {}; },
     async meuPerfil(){ if(!me) return {perfil:null, escritorio:db.esc, motivo:"sem_login"}; return {perfil:Object.assign({}, db.perfis.find(p=>p.id===me)), escritorio:db.esc}; },
     async carregar(t){ return (db[t]||[]).map(r=>Object.assign({}, r)); },
-    async inserir(t, row){ const r = Object.assign({id:P.uid(), criado_em:agora(), criado_por:me}, row); if(t==="convites"){ r.token = Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2); r.expira_em = r.expira_em || P.addDays(new Date(),7).toISOString(); } db[t].push(r); avisar(t); return Object.assign({}, r); },
+    async inserir(t, row){ const r = Object.assign({id:P.uid(), criado_em:agora(), criado_por:me}, row); if(t==="convites"){ r.token = Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2); if(r.expira_em===undefined) r.expira_em = P.addDays(new Date(),7).toISOString(); } db[t].push(r); avisar(t); return Object.assign({}, r); },
     async atualizar(t, k, patch){ const r = db[t].find(x=>x.id===k); if(r) Object.assign(r, patch, {atualizado_em:agora()}); avisar(t); return patch; },
     async excluir(t, k){ db[t] = db[t].filter(x=>x.id!==k); if(t==="processos") ["tarefas","andamentos","documentos"].forEach(c=>db[c] = db[c].filter(x=>x.processo_id!==k)); avisar(t); },
     ouvir(cb){ cbs = [cb]; },

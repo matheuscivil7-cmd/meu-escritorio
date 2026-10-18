@@ -491,3 +491,48 @@ a.daily-item:hover{background:var(--surface);border-color:var(--gold-line);trans
 .lei:hover{border-color:var(--gold-line);background:var(--gold-soft)}
 .lei svg{width:14px;height:14px;flex:0 0 auto;color:var(--gold)}
 @media (max-width:980px){.dg-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- Daily com miniaturas e filtros fixos ---------- */
+.daily-head{display:flex;flex-direction:column;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.daily-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:4px;padding:8px 2px 12px;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.daily-list::-webkit-scrollbar{width:8px}.daily-list::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px}
+.daily-item{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;align-items:start;flex-direction:initial}
+.daily-item .thumb{position:relative;width:76px;height:76px;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,var(--surface-3),var(--surface-2));border:1px solid var(--line);display:grid;place-items:center}
+.daily-item .thumb.trabalhista{background:linear-gradient(135deg,var(--trab-soft),var(--surface-2))}
+.daily-item .thumb.civel{background:linear-gradient(135deg,var(--civ-soft),var(--surface-2))}
+.daily-item .thumb.criminal{background:linear-gradient(135deg,var(--crim-soft),var(--surface-2))}
+.daily-item .thumb .sg{font-family:var(--f-display);font-weight:700;font-size:1.25rem;color:var(--gold);letter-spacing:.02em}
+.daily-item .thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .4s var(--ease)}
+a.daily-item:hover .thumb img{transform:scale(1.06)}
+.daily-item .di-txt{display:flex;flex-direction:column;gap:4px;min-width:0}
+.daily-item .di-tit{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.daily-item .di-res{font-size:.8rem;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.land-daily{position:sticky;top:66px;height:calc(100vh - 66px);height:calc(100dvh - 66px);overflow:hidden;align-self:start}
+.daily-box{display:flex;flex-direction:column;padding:16px;max-height:calc(100vh - 190px);max-height:calc(100dvh - 190px);overflow:hidden}
+@media (max-width: 980px){
+  .land-daily{position:static;height:calc(100dvh - 66px);padding-bottom:0}
+  .land-daily .daily-list{padding-bottom:110px}
+  .daily-box{max-height:calc(100dvh - 230px)}
+}
+/* Direito geral: colunas com rolagem própria */
+@media (min-width: 981px){
+  .dg-col{max-height:calc(100vh - 250px);max-height:calc(100dvh - 250px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent;padding-right:4px}
+  .dg-col::-webkit-scrollbar{width:8px}.dg-col::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px}
+}
+
+/* ---------- Assistente: ações ---------- */
+.acao-card{border:1px solid var(--gold-line);border-radius:var(--r-sm);background:linear-gradient(180deg,var(--gold-soft),transparent 70%);padding:12px 14px}
+.acao-t{display:flex;align-items:center;gap:8px;color:var(--gold);margin-bottom:8px}
+.acao-t svg{width:16px;height:16px}
+.acao-t b{color:var(--ink)}
+.acao-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0}
+.acao-dl div{display:contents}
+.acao-dl dt{color:var(--muted);font-size:.82rem}
+.acao-dl dd{margin:0;font-size:.9rem;overflow-wrap:anywhere}
+.ajuda-acoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-top:8px}
+.ajuda-item{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2);transition:border-color .2s,transform .2s var(--ease)}
+.ajuda-item:hover{border-color:var(--gold-line);transform:translateY(-1px)}
+.ajuda-item b{font-size:.85rem}
+.ajuda-item span{font-size:.76rem;color:var(--muted)}
+@media (max-width:560px){.acao-dl{grid-template-columns:minmax(0,1fr)}.acao-dl dt{margin-top:4px}}
+.daily-box .dh h2{display:none}
