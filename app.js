@@ -35,6 +35,7 @@ const ICON = {
   cnj: sv('<path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/>'),
   paleta: sv('<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2a4.6 4.6 0 0 0 4.6-4.6C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/>'),
   arrowL: sv('<path d="M19 12H5M11 6l-6 6 6 6"/>','stroke-width="2.2"'),
+  direito: sv('<path d="M12 3v18M7 21h10M4 7h16M4 7l-2.5 6a3 3 0 0 0 5 0zM20 7l-2.5 6a3 3 0 0 0 5 0z"/>'),
   ajustes: sv('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>')
 };
 
@@ -47,6 +48,7 @@ const D = {area:"todas", dia:""};
 const L = {pane:"entrar", ferramenta:"", motivo:"", erro:"", carregando:true, entrando:false, chat:[], chatInput:"", chatOcupado:false,
   calc:{area:"civel", inicio:P.hoje(), dias:15, contagem:"auto", djen:true, suspende:true}, cnj:"", doc:null, docNome:"", docPergunta:"", docIA:null, docOcupado:false, docErro:"", papelPedido:"advogado", nomeEsc:""};
 const CH = {msgs:[], input:"", ocupado:false};
+const DG = {area:"todas", termo:"", aberto:"", juris:""};
 Object.assign(L, {tela:"entrar", token:"", convite:null, erroForm:"", msg:"", enviando:false, emailDigitado:""});
 S.convites = [];
 
@@ -161,11 +163,12 @@ function envolverApi(){
 
 /* ---------- TELA INICIAL: login no centro, ferramentas livres e Daily ---------- */
 const FERRAMENTAS = [
-  ["assistente-ia","Assistente jurídico","Dúvidas gerais respondidas pela IA","ia"],
+  ["duvidas","Dúvidas jurídicas","Pergunte e receba a regra, a lei e as súmulas","assistente"],
+  ["direito","Direito geral","Jurisprudência, súmulas, temas e leis","gavel"],
   ["prazos","Calculadora de prazos","CPC, CLT e CPP com feriados","agenda"],
   ["cnj","Conferir número de processo","Valida e identifica o tribunal","cnj"],
   ["documento","Ler documento","Acha prazos, audiências e números no PDF ou Word","scan"]
-].filter(f=>f[0]!=="assistente-ia" || P.temIA());
+];
 function mostrarInicio(){
   const ativo = L.ferramenta;
   const tabs = [["entrar","Entrar","inicio"],["ferramentas","Ferramentas","mais"],["daily","Daily","daily"]];
@@ -244,6 +247,8 @@ function listaDaily(lateral){
 const TJ = ["","AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SE","SP","TO"];
 function vFerramenta(){
   const f = L.ferramenta, voltar = `<button class="btn ghost" data-act="ferramenta-fechar">${ICON.arrowL} Voltar ao login</button>`;
+  if(f==="duvidas") return `<div class="tool-view">${chatHTML({msgs:L.chat, input:L.chatInput, idIn:"chat-in", bind:"L.chatInput", act:"chat", titulo:"Dúvidas jurídicas", sub:"Pergunte com suas palavras. A resposta traz a regra, o prazo e o fundamento legal.", voltar, sug:["Quais verbas são devidas na demissão sem justa causa?","Qual o prazo da apelação?","Como conto prazo publicado no DJEN?","Quando cabe ANPP?"]})}</div>`;
+  if(f==="direito") return `<div class="tool-view">${vDireito(voltar)}</div>`;
   if(f==="assistente-ia"){
     const sug = ["Quais verbas são devidas na rescisão sem justa causa?","Como funciona a contagem de prazo em dias úteis no CPC?","Diferença entre apelação e agravo de instrumento","O que é prescrição intercorrente?"];
     return `<div class="tool-view"><div class="head"><div><span class="ia-tag">${ICON.ia} Inteligência artificial</span><h1>Assistente jurídico</h1><div class="sub">Dúvidas gerais de Direito. Não cole dados de clientes aqui.</div></div>${L.chat.length?`<button class="btn ghost" data-act="chat-limpar">Nova conversa</button>`:voltar}</div>
@@ -313,7 +318,8 @@ function itensNav(){
   const it = [["inicio","Início"],["agenda","Agenda"],["processos","Processos"]];
   if(pode("gerenciar_clientes")||pode("ver_todos_processos")) it.push(["clientes","Clientes"]);
   if(pode("revisar_minutas")) it.push(["minutas","Revisão de minuta"]);
-  if(P.temIA()) it.push(["assistente","Assistente IA"]);
+  it.push(["assistente","Assistente"]);
+  it.push(["direito","Direito geral"]);
   it.push(["daily","Daily jurídico"]);
   if(pode("gerar_relatorios")||pode("enviar_cliente")) it.push(["relatorios","Relatórios"]);
   if(pode("gerenciar_equipe")) it.push(["equipe","Equipe e acessos"]);
@@ -337,7 +343,7 @@ function render(dados){
   const pend = pode("gerenciar_equipe") ? S.pedidos.length : 0;
   const badge = k => k==="agenda" && atr ? `<span class="badge" title="Prazos vencidos">${atr}</span>` : k==="equipe" && pend ? `<span class="badge" title="Pedidos de acesso">${pend}</span>` : "";
   $("#nav").innerHTML = `<span class="ind"></span>` + nav.map(([k,l])=>`<button class="navbtn" data-act="nav" data-v="${k}" aria-current="${view===k}">${ICON[k]}<span>${l}</span>${badge(k)}</button>`).join("");
-  const tb = ehCliente() ? [["portal","Processos"],["perfil","Conta"]] : [["inicio","Início"],["agenda","Agenda"],["processos","Processos"],P.temIA()?["assistente","IA"]:["daily","Daily"],["mais","Mais"]];
+  const tb = ehCliente() ? [["portal","Processos"],["perfil","Conta"]] : [["inicio","Início"],["agenda","Agenda"],["processos","Processos"],["assistente","Assistente"],["mais","Mais"]];
   const extra = nav.map(([k])=>k).filter(k=>!tb.some(([x])=>x===k));
   $("#tabbar").style.setProperty("--n", tb.length);
   $("#tabbar").innerHTML = tb.map(([k,l])=>`<button data-act="${k==="mais"?"mais":k==="perfil"?"perfil":"nav"}" data-v="${k}" aria-current="${k==="mais"?extra.includes(view):view===k}"><span class="pill">${ICON[k]||ICON.ajustes}</span>${l}${badge(k)}${k==="mais"&&pend?`<span class="badge">${pend}</span>`:""}</button>`).join("");
@@ -345,7 +351,7 @@ function render(dados){
   const ae = document.activeElement;
   const editando = dados && ae && $("#main").contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.id!=="busca";
   if((!dados || vivo) && !editando){
-    const fn = {inicio:vInicio, agenda:vAgenda, processos:vProcessos, clientes:vClientes, minutas:vMinutas, assistente:vAssistente, daily:vDaily, relatorios:vRelatorios, equipe:vEquipe, portal:vPortal}[view];
+    const fn = {inicio:vInicio, agenda:vAgenda, processos:vProcessos, clientes:vClientes, minutas:vMinutas, assistente:vAssistente, direito:()=>vDireito(""), daily:vDaily, relatorios:vRelatorios, equipe:vEquipe, portal:vPortal}[view];
     const main = $("#main");
     const foco = ae && ae.id==="busca" ? ae.selectionStart : null;
     main.innerHTML = (api.modo==="demo"?`<div class="banner">Demonstração fora do Claude: dados de exemplo, nada é salvo.</div>`:"") + fn();
@@ -404,7 +410,7 @@ function vInicio(){
     (pode("editar_processos")||pode("registrar_andamentos")) && ["ler-pdf","","Ler intimação","PDF vira prazo",ICON.scan],
     pode("revisar_minutas") && ["nav","minutas","Revisar minuta","Comentários do cliente",ICON.minutas],
     pode("enviar_cliente") && ["nav","relatorios","Mensagem ao cliente","Resumo pronto para copiar",ICON.send],
-    P.temIA() && ["nav","assistente","Assistente IA","Pergunte sobre a carteira",ICON.ia],
+    ["nav","assistente","Assistente","Pergunte sobre a carteira",ICON.assistente],
     ["nav","daily","Daily jurídico","Notícias do dia",ICON.daily],
     !pode("criar_tarefas") && ["nova-tarefa","Peça","Nova atividade","Para mim",ICON.plus]
   ].filter(Boolean).slice(0,6);
@@ -587,48 +593,147 @@ function vDaily(){
   <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:6px">${listaDaily(false)}</div></div>`;
 }
 
-/* ---------- ASSISTENTE IA (com os dados do escritório) ---------- */
-function vAssistente(){
-  const sug = ["Quais prazos vencem esta semana?","Em que fase estão os processos trabalhistas?","Quais documentos estão aguardando o cliente?","Resuma a situação dos processos de um cliente"];
-  return `<div class="head"><div><span class="ia-tag">${ICON.ia} Inteligência artificial</span><h1>Assistente do escritório</h1><div class="sub">Responde com base nos processos, prazos e documentos que você pode ver, e também tira dúvidas jurídicas gerais.</div></div>${CH.msgs.length?`<button class="btn ghost" data-act="ch-limpar">Nova conversa</button>`:""}</div>
+/* ---------- ASSISTENTE (sem IA: lê os dados do escritório e a base de Direito) ---------- */
+const nrm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+function refazer(){ if($("#main")) render(); else mostrarInicio(); }
+function chatHTML(o){
+  const vazio = !o.msgs.length;
+  return `<div class="head"><div><span class="ia-tag">${ICON.assistente} Sem IA · respostas da base do app</span><h1>${o.titulo}</h1><div class="sub">${o.sub}</div></div>${o.msgs.length?`<button class="btn ghost" data-act="${o.act}-limpar">Nova conversa</button>`:(o.voltar||"")}</div>
   <div class="chat">
-    ${!CH.msgs.length?`<div class="panel"><div class="empty"><h2>Pergunte sobre a carteira</h2><p>Consulta ${S.processos.length} processo(s), ${S.tarefas.filter(t=>!t.done).length} compromisso(s) pendente(s) e os documentos de cada processo.</p>
-      <div class="pickchips" style="justify-content:center">${sug.map(s=>`<button data-act="ch-sug" data-q="${esc(s)}">${esc(s)}</button>`).join("")}</div></div></div>`:""}
-    ${CH.msgs.map(m=>m.role==="user"?`<div class="msg user">${esc(m.content)}</div>`:`<div class="msg bot answer">${P.md(m.content)||`<span class="spinner"></span>`}</div>`).join("")}
+    ${vazio?`<div class="panel"><div class="empty"><h2>${o.vazioTitulo||"Pergunte com suas palavras"}</h2><p>${o.vazioTexto||"Exemplos:"}</p>
+      <div class="pickchips" style="justify-content:center">${o.sug.map(s=>`<button data-act="${o.act}-sug" data-q="${esc(s)}">${esc(s)}</button>`).join("")}</div></div></div>`:""}
+    ${o.msgs.map(m=>m.role==="user"?`<div class="msg user">${esc(m.content)}</div>`:`<div class="msg bot answer">${m.html}</div>`).join("")}
     <div id="chat-fim"></div></div>
-  <div class="composer"><textarea id="ch-in" rows="1" data-bind="CH.input" placeholder="Ex.: Em que pé está o processo do João Batista?">${esc(CH.input)}</textarea><button class="btn primary" data-act="ch-enviar" ${CH.ocupado?"disabled":""}>${CH.ocupado?`<span class="spinner"></span>`:"Enviar"}</button></div>`;
+  <div class="composer"><textarea id="${o.idIn}" rows="1" data-bind="${o.bind}" placeholder="${o.ph||"Escreva sua pergunta"}">${esc(o.input)}</textarea><button class="btn primary" data-act="${o.act}-enviar">Enviar</button></div>`;
 }
-function contextoEscritorio(){
-  return JSON.stringify({
-    hoje: hoje(), escritorio: S.escritorio?.nome,
-    processos: S.processos.map(p=>({numero:p.numero, area:AREAS[p.area]?.nome, cliente:nomeCliente(p), polo:p.polo, parteContraria:p.parte_contraria, vara:p.vara, fase:p.fase, responsavel:nomePerfil(p.responsavel_id), valor:p.valor, situacaoInterna:p.resumo, resumoParaCliente:p.resumo_cliente,
-      andamentos: andamentosDe(p.id).slice(0,8).map(a=>({data:a.data, texto:a.texto, clienteVe:!!a.visivel_cliente})), documentos: docsDe(p.id).map(d=>({nome:d.nome, situacao:d.status}))})),
-    compromissos: S.tarefas.map(t=>({tipo:t.tipo, descricao:t.titulo, processo:procById(t.processo_id)?.numero||null, cliente:nomeCliente(procById(t.processo_id))||null, data:t.data, prazoInterno:t.interno||null, hora:t.hora||null, local:t.local||null, com:nomePerfil(t.atribuido_a)||null, concluido:!!t.done})),
-    clientes: S.clientes.map(c=>({nome:c.nome, tipo:c.tipo}))
-  }).slice(0,140000);
+function vAssistente(){
+  return chatHTML({msgs:CH.msgs, input:CH.input, idIn:"ch-in", bind:"CH.input", act:"ch", titulo:"Assistente do escritório",
+    sub:"Pergunte sobre processos, prazos, audiências e documentos cadastrados, ou tire uma dúvida jurídica geral.",
+    vazioTitulo:"Pergunte sobre a carteira", vazioTexto:`Consulta ${S.processos.length} processo(s), ${S.tarefas.filter(t=>!t.done).length} compromisso(s) pendente(s) e os documentos que você pode ver.`,
+    ph:"Ex.: Como está o processo da Maria? · Prazos desta semana",
+    sug:["Quais prazos vencem esta semana?","Próximas audiências","Documentos aguardando o cliente","Em que fase estão os processos trabalhistas?","Qual o prazo do recurso ordinário?"]});
 }
-async function enviarChatEscritorio(q){
-  q = String(q ?? CH.input).trim(); if(!q || CH.ocupado) return;
+/* respostas da base de Direito, em HTML */
+function respostaBase(q, area){
+  const r = P.buscarBase(q, area, 3);
+  if(!r.length) return "";
+  return r.map((e,i)=>`<div class="kb${i?" kb-mais":""}"><div class="row" style="gap:8px;margin-bottom:4px"><b>${esc(e.tema)}</b>${e.area!=="geral"?`<span class="chip ${e.area}">${P.NOME_AREA_DIREITO[e.area]}</span>`:""}</div>${P.md(e.resp)}<div class="small muted" style="margin-top:6px">Fundamento: ${esc(e.base)}</div></div>`).join("")
+    + `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">Ver julgados sobre "${esc(r[0].tema)}":</span>${["stj","tst","jusbrasil"].map(o=>`<button class="linkbtn small" data-act="juris" data-o="${o}" data-q="${esc(r[0].tema)}">${P.ONDE_PESQUISAR.find(x=>x[0]===o)[1]}</button>`).join("")}</div>`
+    + `<div class="hint" style="margin-top:6px">${esc(P.AVISO_BASE)}</div>`;
+}
+function semResposta(q){
+  return `<p>Não encontrei esse assunto na base do app.</p><p class="small">Tente com outras palavras (por exemplo: <i>prazo apelação</i>, <i>verbas rescisórias</i>, <i>prisão preventiva</i>), veja os temas em <b>Direito geral</b> ou pesquise julgados:</p>
+    <div class="row" style="gap:6px">${["stf","stj","tst","jusbrasil"].map(o=>`<button class="btn" data-act="juris" data-o="${o}" data-q="${esc(q)}">${P.ONDE_PESQUISAR.find(x=>x[0]===o)[1]}</button>`).join("")}</div>`;
+}
+/* perguntas sobre a carteira do escritório */
+function responderEscritorio(q){
+  const n = nrm(q), h = hoje();
+  const li = arr => `<ul style="margin:6px 0 0;padding-left:18px">${arr.join("")}</ul>`;
+  const linhaT = t => { const p = procById(t.processo_id); const atras = !t.done && t.data<h; return `<li><b>${fmt(t.data)}</b>${t.hora?" "+esc(t.hora):""} · ${esc(t.tipo)}: ${esc(t.titulo||"")}${p?` <span class="muted">(${esc(nomeCliente(p))}${p.numero?" · "+esc(p.numero):""})</span>`:""}${t.atribuido_a?` <span class="muted">· ${esc(nomePerfil(t.atribuido_a))}</span>`:""}${atras?` <span class="chip danger">vencido</span>`:""}</li>`; };
+  // 1. processo citado pelo número ou pelo nome do cliente / parte
+  const dig = (q.match(/\d[\d.\-]{6,}/g)||[]).map(x=>x.replace(/\D/g,"")).filter(x=>x.length>=7);
+  let procs = dig.length ? S.processos.filter(p=>dig.some(d=>(p.numero||"").replace(/\D/g,"").includes(d))) : [];
+  if(!procs.length){
+    const palavras = n.split(/[^a-z0-9]+/).filter(w=>w.length>=4 && !["processo","processos","cliente","situacao","como","esta","qual","fase","andamento","prazo","prazos","sobre","caso"].includes(w));
+    const casa = nome => { const ws = nrm(nome).split(/[^a-z0-9]+/).filter(w=>w.length>=3); return ws.length && palavras.some(w=>ws.includes(w)); };
+    procs = S.processos.filter(p=>casa(nomeCliente(p)) || casa(p.parte_contraria));
+  }
+  if(procs.length){
+    return procs.slice(0,3).map(p=>{
+      const ands = andamentosDe(p.id), docs = docsDe(p.id).filter(d=>["Rascunho","Aguardando cliente"].includes(d.status));
+      const prox = S.tarefas.filter(t=>t.processo_id===p.id && !t.done).sort((a,b)=>(a.data||"").localeCompare(b.data||"")).slice(0,4);
+      return `<div class="kb"><div class="row" style="gap:8px"><b class="mono">${esc(p.numero||"Sem número")}</b>${chipArea(p.area)}<span class="chip neutral">${esc(p.fase||"")}</span></div>
+        <div class="small" style="margin-top:4px">${esc(nomeCliente(p))} × ${esc(p.parte_contraria||"—")}${p.vara?" · "+esc(p.vara):""}${p.responsavel_id?" · resp. "+esc(nomePerfil(p.responsavel_id)):""}</div>
+        ${p.resumo?`<p style="margin:6px 0 0">${esc(p.resumo)}</p>`:""}
+        <div style="margin-top:6px"><b class="small">Último andamento:</b> ${ands[0]?`${fmt(ands[0].data)} · ${esc(ands[0].texto)}`:`<span class="muted">nenhum registrado</span>`}</div>
+        <div style="margin-top:6px"><b class="small">Próximos compromissos:</b> ${prox.length?li(prox.map(linhaT)):`<span class="muted">nenhum pendente</span>`}</div>
+        ${docs.length?`<div style="margin-top:6px"><b class="small">Documentos pendentes:</b> ${li(docs.map(d=>`<li>${esc(d.nome)} <span class="muted">· ${esc(d.status)}</span></li>`))}</div>`:""}
+        <button class="linkbtn small" data-act="abrir-processo" data-id="${p.id}" style="margin-top:6px">Abrir processo</button></div>`;
+    }).join("") + (procs.length>3?`<div class="small muted">E mais ${procs.length-3} processo(s). Seja mais específico ou use a busca.</div>`:"");
+  }
+  // 2. prazos e agenda
+  const area = /trabalh/.test(n) ? "trabalhista" : /civel|civil/.test(n) ? "civel" : /crimin|penal/.test(n) ? "criminal" : "";
+  const daArea = t => !area || areaDaTarefa(t)===area;
+  if(/audienc/.test(n)){
+    const a = S.tarefas.filter(t=>t.tipo==="Audiência" && !t.done && t.data>=h && daArea(t)).sort((x,y)=>(x.data+(x.hora||"")).localeCompare(y.data+(y.hora||"")));
+    return a.length ? `<b>${a.length} audiência(s) marcada(s)${area?" · "+AREAS[area].nome:""}:</b>${li(a.slice(0,15).map(linhaT))}` : "Nenhuma audiência futura cadastrada.";
+  }
+  if(/venc|agenda|semana|hoje|amanha|atras|pendent|pendenc|tarefa|compromisso|minhas|meus|atribu|proxim|\bmes\b|30 dias|7 dias/.test(n)){
+    let t = S.tarefas.filter(x=>!x.done && x.data && daArea(x));
+    if(/minhas|atribuid|para mim|meus/.test(n)) t = t.filter(x=>x.atribuido_a===meuId());
+    if(/prazo/.test(n)) t = t.filter(x=>x.tipo==="Prazo");
+    let rot = "pendentes";
+    if(/atras|vencid/.test(n)){ t = t.filter(x=>x.data<h); rot = "vencidos"; }
+    else if(/hoje/.test(n)){ t = t.filter(x=>x.data===h || dataTrabalho(x)===h); rot = "para hoje"; }
+    else if(/amanha/.test(n)){ const a = iso(addDays(new Date(),1)); t = t.filter(x=>x.data===a); rot = "para amanhã"; }
+    else if(/semana|7 dias/.test(n)){ const f = iso(addDays(new Date(),7)); t = t.filter(x=>x.data<=f); rot = "até os próximos 7 dias (inclui vencidos)"; }
+    else if(/mes/.test(n)){ const f = iso(addDays(new Date(),30)); t = t.filter(x=>x.data<=f); rot = "nos próximos 30 dias"; }
+    t.sort((a,b)=>a.data.localeCompare(b.data));
+    return t.length ? `<b>${t.length} item(ns) ${rot}${area?" · "+AREAS[area].nome:""}:</b>${li(t.slice(0,20).map(linhaT))}${t.length>20?`<div class="small muted">Mostrando 20. Veja todos na Agenda.</div>`:""}` : `Nenhum item ${rot}${area?" na área "+AREAS[area].nome:""}.`;
+  }
+  // 3. documentos
+  if(/document|assinat|aguardando/.test(n)){
+    const d = S.documentos.filter(x=>["Aguardando cliente","Rascunho"].includes(x.status) && (!area || procById(x.processo_id)?.area===area));
+    return d.length ? `<b>${d.length} documento(s) pendente(s):</b>${li(d.slice(0,20).map(x=>{ const p = procById(x.processo_id); return `<li>${esc(x.nome)} · <span class="muted">${esc(x.status)}${p?" · "+esc(nomeCliente(p))+(p.numero?" · "+esc(p.numero):""):""}</span></li>`; }))}` : "Nenhum documento aguardando o cliente ou em rascunho.";
+  }
+  // 4. panorama por fase
+  if(/fase|carteira|panorama|quantos|resumo geral|situacao dos processos|processos (trabalh|civ|crim)/.test(n)){
+    const ps = S.processos.filter(p=>!area || p.area===area);
+    if(!ps.length) return "Nenhum processo cadastrado" + (area?" nessa área.":".");
+    const porFase = FASES.map(f=>[f, ps.filter(p=>p.fase===f)]).filter(([,l])=>l.length);
+    return `<b>${ps.length} processo(s)${area?" · "+AREAS[area].nome:""}</b>${li(porFase.map(([f,l])=>`<li><b>${esc(f)}</b>: ${l.length} <span class="muted">(${l.slice(0,4).map(p=>esc(nomeCliente(p))).join(", ")}${l.length>4?"…":""})</span></li>`))}`;
+  }
+  return "";
+}
+function enviarChatEscritorio(q){
+  q = String(q ?? CH.input).trim(); if(!q) return;
   CH.msgs.push({role:"user", content:q}); CH.input = "";
-  const resp = {role:"assistant", content:""}; CH.msgs.push(resp); CH.ocupado = true; render();
-  const intro = `Você é o assistente interno de um escritório de advocacia no Brasil. Para perguntas sobre a carteira, use SOMENTE os dados abaixo (JSON), cite número do processo e cliente, e diga quando algo não está cadastrado. Para dúvidas jurídicas gerais, responda com fundamento. ${P.SEM_INVENTAR} Seja direto, em markdown simples. Datas em dd/mm/aaaa. Hoje é ${P.fmt(hoje())}.\n<dados_do_escritorio>\n${contextoEscritorio()}\n</dados_do_escritorio>`;
-  const hist = CH.msgs.slice(0,-1).map(m=>({role:m.role, content:m.content}));
-  hist[0] = {role:"user", content:intro+"\n\nPergunta: "+hist[0].content};
-  let raf = 0;
-  try{ resp.content = await P.iaConversar(hist, t=>{ resp.content = t; if(!raf) raf = requestAnimationFrame(()=>{ raf = 0; const b = [...document.querySelectorAll(".msg.bot")].pop(); if(b) b.innerHTML = P.md(resp.content); }); }); }
-  catch(e){ resp.content = e.code==="indisponivel" ? "A IA funciona com a página aberta no Claude." : P.erroIA(e); }
-  CH.ocupado = false; render();
+  const html = responderEscritorio(q) || respostaBase(q) || semResposta(q);
+  CH.msgs.push({role:"assistant", html}); render();
 }
-async function enviarChatLivre(q){
-  q = String(q ?? L.chatInput).trim(); if(!q || L.chatOcupado) return;
+function enviarChatLivre(q){
+  q = String(q ?? L.chatInput).trim(); if(!q) return;
   L.chat.push({role:"user", content:q}); L.chatInput = "";
-  const resp = {role:"assistant", content:""}; L.chat.push(resp); L.chatOcupado = true; mostrarInicio(); $("#chat-fim")?.scrollIntoView({block:"end"});
-  const hist = L.chat.slice(0,-1).map(m=>({role:m.role, content:m.content}));
-  hist[0] = {role:"user", content:P.PROMPT_GERAL+"\n\nPergunta: "+hist[0].content};
-  let raf = 0;
-  try{ resp.content = await P.iaConversar(hist, t=>{ resp.content = t; if(!raf) raf = requestAnimationFrame(()=>{ raf = 0; const b = [...document.querySelectorAll(".msg.bot")].pop(); if(b) b.innerHTML = P.md(resp.content); }); }); }
-  catch(e){ resp.content = e.code==="indisponivel" ? "A IA funciona com a página aberta no Claude." : P.erroIA(e); }
-  L.chatOcupado = false; mostrarInicio(); $("#chat-fim")?.scrollIntoView({block:"end"});
+  L.chat.push({role:"assistant", html: respostaBase(q) || semResposta(q)});
+  mostrarInicio(); $("#chat-fim")?.scrollIntoView({block:"end"});
+}
+/* ---------- DIREITO GERAL ---------- */
+function listaTemas(){
+  const t = DG.termo.trim();
+  let itens = t ? P.buscarBase(t, DG.area, 12) : P.BASE_DIREITO.filter(e=>DG.area==="todas" || e.area===DG.area || (DG.area!=="todas" && e.area==="geral"));
+  if(!itens.length) return `<div class="empty small">Nada encontrado para "${esc(t)}". Use a pesquisa de jurisprudência ao lado.</div>`;
+  return itens.map(e=>`<div class="tema${DG.aberto===e.id?" aberto":""}"><button class="tema-h" data-act="dg-abrir" data-id="${e.id}" aria-expanded="${DG.aberto===e.id}"><span>${esc(e.tema)}</span>${e.area!=="geral"?`<span class="chip ${e.area}">${P.NOME_AREA_DIREITO[e.area]}</span>`:""}</button>
+    ${DG.aberto===e.id?`<div class="tema-b">${P.md(e.resp)}<div class="small muted" style="margin-top:6px">Fundamento: ${esc(e.base)}</div><div class="row" style="gap:6px;margin-top:8px"><span class="small muted">Julgados:</span>${["stf","stj","tst","jusbrasil"].map(o=>`<button class="linkbtn small" data-act="juris" data-o="${o}" data-q="${esc(e.tema)}">${P.ONDE_PESQUISAR.find(x=>x[0]===o)[1]}</button>`).join("")}</div></div>`:""}</div>`).join("");
+}
+function vDireito(voltar){
+  const areas = [["todas","Todas"],["trabalhista","Trabalhista"],["civel","Cível"],["criminal","Criminal"]];
+  const sums = P.SUMULAS.filter(s=>DG.area==="todas" || s[3]===DG.area);
+  const UF = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SE","SP","TO"];
+  return `<div class="head"><div><h1>Direito geral</h1><div class="sub">Temas do dia a dia com prazo e fundamento, súmulas de consulta frequente, pesquisa de jurisprudência nos tribunais e acesso às leis.</div></div>${voltar||""}</div>
+  <div class="tabs" role="tablist"><span class="ind"></span>${areas.map(([k,l])=>`<button role="tab" aria-selected="${DG.area===k}" data-act="dg-area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}</button>`).join("")}</div>
+  <div class="dg-grid">
+    <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
+      <h2 style="font-size:1.05rem;margin:0">Temas e regras</h2>
+      <div class="search" style="margin:0">${ICON.search}<input type="search" id="dg-busca" value="${esc(DG.termo)}" placeholder="Buscar tema: prazo apelação, verbas, fiança…" autocomplete="off"></div>
+      <div id="dg-lista" class="temas">${listaTemas()}</div>
+      <div class="hint">${esc(P.AVISO_BASE)}</div></div></div>
+    <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
+        <h2 style="font-size:1.05rem;margin:0">Pesquisar jurisprudência</h2>
+        <label class="f">Tema ou palavras-chave<input type="text" id="jp-termo" value="${esc(DG.juris)}" placeholder="Ex.: dano moral atraso voo"></label>
+        <div class="row" style="gap:6px">${["stf","stj","tst","jusbrasil"].map(o=>`<button class="btn" data-act="juris" data-o="${o}">${P.ONDE_PESQUISAR.find(x=>x[0]===o)[1]}</button>`).join("")}</div>
+        <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="jp-uf" aria-label="Estado" style="max-width:90px">${UF.map(u=>`<option ${u==="SP"?"selected":""}>${u}</option>`).join("")}</select><button class="btn" data-act="juris" data-o="tj" style="flex:1">TJ do estado</button></div>
+        <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="jp-trt" aria-label="Região" style="max-width:90px">${Array.from({length:24},(_,i)=>`<option value="${i+1}" ${i===1?"selected":""}>${i+1}ª</option>`).join("")}</select><button class="btn" data-act="juris" data-o="trt" style="flex:1">TRT da região</button></div>
+        <button class="btn ghost" data-act="juris" data-o="lexml">Pesquisar na legislação (LexML)</button>
+        <div class="hint">Abre a busca no site oficial ou no Google filtrado pelo tribunal, em nova aba.</div></div></div>
+      <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="font-size:1.05rem;margin:0">Súmulas de consulta frequente</h2>
+        ${sums.map(s=>`<div class="sumula"><span class="chip neutral mono">${s[0]} ${s[1]}</span><span class="small">${esc(s[2])}</span></div>`).join("")}
+        <div class="hint">Resumo do enunciado. Leia o texto oficial no site do tribunal.</div></div></div>
+      <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="font-size:1.05rem;margin:0">Leis (Planalto)</h2>
+        <div class="leis">${P.LEIS.map(([n,u])=>`<a class="lei" href="${u}" target="_blank" rel="noopener">${esc(n)} ${ICON.arrow}</a>`).join("")}</div></div></div>
+    </div></div>`;
 }
 /* ---------- RELATÓRIOS ---------- */
 function vRelatorios(){
@@ -762,7 +867,7 @@ function mAparencia(m){
   </div><div class="sheet-f"><button class="btn ghost" data-act="tema-padrao" style="margin-right:auto">Restaurar padrão</button>${S.perfil && pode("gerenciar_equipe")?`<button class="btn" data-act="tema-escritorio">Usar como padrão do escritório</button>`:""}<button class="btn primary" data-act="tema-salvar">Salvar</button></div>`;
 }
 function mMais(){
-  const extra = itensNav().filter(([k])=>!["inicio","agenda","processos",P.temIA()?"assistente":"daily"].includes(k));
+  const extra = itensNav().filter(([k])=>!["inicio","agenda","processos","assistente"].includes(k));
   return cab("Mais") + `<div class="sheet-b"><div class="more-grid">${extra.map(([k,l])=>`<button class="act" data-act="nav" data-v="${k}"><span class="ic">${ICON[k]}</span><span>${l}</span></button>`).join("")}<button class="act" data-act="perfil"><span class="ic">${ICON.ajustes}</span><span>Minha conta</span></button></div></div>`;
 }
 function mCom(m){ const c = S.comunicacoes.find(x=>x.id===m.id); return cab("Mensagem de "+new Date(c.enviado_em||c.criado_em).toLocaleString("pt-BR"), esc(nomePerfil(c.enviado_por||c.criado_por))) + `<div class="sheet-b"><div class="small muted">Para: ${esc(cliById(c.cliente_id)?.nome||c.destino||"")}</div><div class="pre">${esc(c.texto||"")}</div><div class="row"><button class="btn" data-act="copiar-txt" data-t="${esc(c.texto||"")}">${ICON.copy}Copiar de novo</button></div></div>`; }
@@ -1185,6 +1290,9 @@ document.addEventListener("click", async e => {
     case "ch-enviar": enviarChatEscritorio(); break;
     case "ch-sug": enviarChatEscritorio(el.dataset.q); break;
     case "ch-limpar": CH.msgs = []; render(); break;
+    case "dg-area": DG.area = el.dataset.a; refazer(); break;
+    case "dg-abrir": DG.aberto = DG.aberto===el.dataset.id ? "" : el.dataset.id; refazer(); break;
+    case "juris": { const q = ($("#jp-termo")?.value || el.dataset.q || "").trim(); if(!q){ toast("Escreva o tema da pesquisa."); $("#jp-termo")?.focus(); break; } DG.juris = q; const o = P.ONDE_PESQUISAR.find(x=>x[0]===el.dataset.o); const extra = el.dataset.o==="tj" ? ($("#jp-uf")?.value||"SP") : el.dataset.o==="trt" ? ($("#jp-trt")?.value||"2") : ""; window.open(o[2](q, extra), "_blank", "noopener"); break; }
   }
 });
 function salvarCamposMinuta(){ document.querySelectorAll("[data-mi]").forEach(t=>{ const i = M.itens[Number(t.dataset.mi)]; if(i && i[t.dataset.k]!==t.value){ i[t.dataset.k] = t.value; if(t.dataset.k==="resposta") i._auto = false; } }); }
@@ -1215,7 +1323,8 @@ document.addEventListener("submit", async e => {
 });
 document.addEventListener("input", e => {
   const el = e.target, b = el.dataset.bind;
-  if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH})[o][k] = el.value; return; }
+  if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH,DG})[o][k] = el.value; return; }
+  if(el.id==="dg-busca"){ DG.termo = el.value; const l = $("#dg-lista"); if(l) l.innerHTML = listaTemas(); return; }
   if(el.dataset.calc && el.type!=="checkbox"){ L.calc[el.dataset.calc] = el.value; const pos = el.selectionStart; const idEl = el.id; mostrarInicio(); const n = document.getElementById(idEl); if(n && n.type!=="date"){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(_){} } return; }
   if(el.id==="cnj-in"){ L.cnj = P.mascaraCNJ(el.value); mostrarInicio(); const n = $("#cnj-in"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); return; }
   if(el.id==="pessoa-q"){ buscarPessoas(el.value); return; }
@@ -1227,7 +1336,7 @@ document.addEventListener("change", async e => {
   const el = e.target;
   if(el.dataset.file){ await receberArquivo(el.dataset.file, el.files[0], el.dataset.proc); el.value = ""; return; }
   if(el.dataset.calc){ L.calc[el.dataset.calc] = el.type==="checkbox" ? el.checked : el.value; mostrarInicio(); return; }
-  if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH})[o][k] = el.value; return; }
+  if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG})[o][k] = el.value; return; }
   if(el.id==="daily-dia"){ D.dia = el.value; render(); return; }
   if(el.id==="l-papel"){ L.papelPedido = el.value; return; }
   if(el.dataset.act==="doc-status"){ await comErro(async()=>{ await api.atualizar("documentos", el.dataset.id, {status:el.value}); agendarRecarga("documentos"); }); return; }
