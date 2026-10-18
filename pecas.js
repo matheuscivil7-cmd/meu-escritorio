@@ -1,0 +1,243 @@
+/* Pauta Jurídica · peças, contratos, procurações e checklists (sem IA, tudo no navegador)
+   Os textos são modelos de partida: o advogado revisa, ajusta e assina. */
+(function(P){
+"use strict";
+const e = s => String(s ?? "").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const F = s => `<span class="preencher">[${e(s)}]</span>`;
+const val = (v, rot) => v && String(v).trim() ? e(v) : F(rot);
+
+/* ---------------- CHECKLISTS DE DOCUMENTOS POR AÇÃO ---------------- */
+P.CHECKLISTS = {
+  trab_reclamatoria:{area:"trabalhista", nome:"Reclamação trabalhista", itens:["RG e CPF","Comprovante de residência","Procuração assinada","Declaração de hipossuficiência assinada","Carteira de trabalho (física ou digital)","Holerites / contracheques","Termo de rescisão (TRCT) e guias","Extrato do FGTS","Cartões de ponto ou registros de jornada","Contrato de trabalho e aditivos","Mensagens, e-mails ou provas do caso","Nomes e contatos das testemunhas"]},
+  trab_acidente:{area:"trabalhista", nome:"Acidente ou doença do trabalho", itens:["RG e CPF","Comprovante de residência","Procuração assinada","Carteira de trabalho","CAT (Comunicação de Acidente de Trabalho)","Atestados, exames e laudos médicos","Comunicações do INSS (benefício)","Holerites","Fotos do local ou do acidente","Nomes e contatos das testemunhas"]},
+  civ_consumidor:{area:"civel", nome:"Indenizatória · consumidor", itens:["RG e CPF","Comprovante de residência","Procuração assinada","Declaração de hipossuficiência (se pedir gratuidade)","Nota fiscal ou comprovante da compra","Contrato, oferta ou publicidade","Protocolo do atendimento","Prints da conversa com a empresa","Fotos ou vídeos do problema","Comprovantes de gastos (danos materiais)","Reclamação no Procon ou consumidor.gov.br (se houver)"]},
+  civ_cobranca:{area:"civel", nome:"Ação de cobrança", itens:["Documentos pessoais ou contrato social (empresa)","Procuração assinada","Contrato, nota, cheque ou outro título","Comprovantes da entrega ou do serviço","Notificações e cobranças já enviadas","Planilha do débito atualizado"]},
+  civ_divorcio:{area:"civel", nome:"Divórcio", itens:["RG e CPF","Certidão de casamento atualizada","Certidão de nascimento dos filhos","Comprovante de residência","Comprovantes de renda","Documentos dos bens (matrículas, veículos, extratos)","Pacto antenupcial (se houver)","Procuração assinada"]},
+  civ_alimentos:{area:"civel", nome:"Alimentos (pensão)", itens:["Certidão de nascimento da criança","RG e CPF do representante","Comprovante de residência","Comprovantes de despesas da criança (escola, saúde, alimentação)","Informações sobre a renda de quem vai pagar","Procuração assinada","Declaração de hipossuficiência"]},
+  civ_inventario:{area:"civel", nome:"Inventário", itens:["Certidão de óbito","Documentos pessoais do falecido","Documentos e certidões dos herdeiros","Certidão de casamento do falecido","Certidão de testamento (CENSEC)","Matrículas dos imóveis","Extratos bancários e investimentos","Documentos dos veículos","Certidões negativas de débitos","Procuração assinada"]},
+  crim_defesa:{area:"criminal", nome:"Defesa criminal", itens:["RG e CPF","Comprovante de residência","Comprovante de trabalho ou ocupação","Certidões de antecedentes","Cópia do inquérito ou da denúncia","Boletim de ocorrência","Documentos que ajudam a defesa (álibi, recibos, mensagens)","Nomes e contatos das testemunhas","Procuração assinada"]}
+};
+
+/* ---------------- TESES (modelos de fundamentação) ---------------- */
+P.TESES = [
+  // trabalhista
+  {id:"t_gratuidade_trab", area:"trabalhista", titulo:"Justiça gratuita", fundamento:"CLT, art. 790, §§ 3º e 4º; CPC, art. 99, § 3º",
+   texto:"O(A) Reclamante não tem condições de arcar com as custas do processo sem prejuízo do próprio sustento e de sua família, conforme declaração anexa, razão pela qual requer os benefícios da justiça gratuita.",
+   pedido:"a concessão dos benefícios da justiça gratuita"},
+  {id:"t_verbas", area:"trabalhista", titulo:"Verbas rescisórias", fundamento:"CLT, arts. 477 e 487; Lei 8.036/90, art. 18",
+   texto:"Dispensado(a) sem justa causa, o(a) Reclamante não recebeu corretamente as verbas rescisórias devidas, como saldo de salário, aviso prévio proporcional, 13º salário proporcional, férias vencidas e proporcionais acrescidas de 1/3 e a indenização de 40% sobre os depósitos do FGTS. O pagamento fora do prazo de 10 dias também gera a multa do art. 477, § 8º, da CLT.",
+   pedido:"o pagamento das verbas rescisórias não quitadas, com a multa do art. 477, § 8º, da CLT"},
+  {id:"t_horas", area:"trabalhista", titulo:"Horas extras", fundamento:"CF, art. 7º, XIII e XVI; CLT, arts. 58, 59 e 74, § 2º; Súmula 338 do TST",
+   texto:"O(A) Reclamante cumpria jornada superior ao limite legal de 8 horas diárias e 44 semanais, sem o correto pagamento das horas extras com o adicional mínimo de 50%. Cabe ao empregador com mais de 20 empregados manter o registro de jornada; a ausência ou invalidade dos controles faz presumir verdadeira a jornada alegada.",
+   pedido:"o pagamento das horas extras excedentes à 8ª diária e à 44ª semanal, com adicional de 50% e reflexos"},
+  {id:"t_intervalo", area:"trabalhista", titulo:"Intervalo para refeição suprimido", fundamento:"CLT, art. 71, caput e § 4º",
+   texto:"Embora trabalhasse mais de 6 horas por dia, o(a) Reclamante não usufruía integralmente do intervalo mínimo de 1 hora, sendo devido o pagamento do período suprimido com acréscimo de 50%.",
+   pedido:"o pagamento do intervalo intrajornada suprimido, com acréscimo de 50%"},
+  {id:"t_insalubridade", area:"trabalhista", titulo:"Adicional de insalubridade", fundamento:"CLT, arts. 189, 192 e 195",
+   texto:"O(A) Reclamante trabalhava exposto(a) a agentes nocivos à saúde sem a devida neutralização, fazendo jus ao adicional de insalubridade, a ser apurado em perícia técnica.",
+   pedido:"o pagamento do adicional de insalubridade em grau a ser apurado em perícia, com reflexos"},
+  {id:"t_fgts", area:"trabalhista", titulo:"Depósitos de FGTS em atraso", fundamento:"Lei 8.036/90, arts. 15 e 18",
+   texto:"Os depósitos do FGTS não foram realizados de forma regular durante o contrato, conforme extrato anexo, devendo o empregador recolher as diferenças com a indenização de 40%.",
+   pedido:"o recolhimento das diferenças de FGTS e da indenização de 40%"},
+  {id:"t_honor_trab", area:"trabalhista", titulo:"Honorários de sucumbência", fundamento:"CLT, art. 791-A",
+   texto:"São devidos honorários de sucumbência entre 5% e 15% sobre o valor que resultar da liquidação da sentença.",
+   pedido:"a condenação da Reclamada em honorários de sucumbência de 15%"},
+  // cível / consumidor
+  {id:"c_consumo", area:"civel", titulo:"Relação de consumo e responsabilidade objetiva", fundamento:"CDC, arts. 2º, 3º e 14",
+   texto:"A relação entre as partes é de consumo: o(a) Autor(a) é destinatário(a) final do produto ou serviço, e a Ré atua como fornecedora. Assim, a Ré responde pelos danos causados independentemente de culpa, bastando a demonstração do defeito, do dano e do nexo entre eles.",
+   pedido:""},
+  {id:"c_inversao", area:"civel", titulo:"Inversão do ônus da prova", fundamento:"CDC, art. 6º, VIII",
+   texto:"As alegações são verossímeis e o(a) consumidor(a) é tecnicamente hipossuficiente frente à fornecedora, que detém os registros e informações do atendimento. Requer a inversão do ônus da prova.",
+   pedido:"a inversão do ônus da prova"},
+  {id:"c_oferta", area:"civel", titulo:"Força vinculante da oferta e publicidade enganosa", fundamento:"CDC, arts. 30, 35 e 37",
+   texto:"Toda informação ou publicidade suficientemente precisa obriga o fornecedor e integra o contrato. A Ré anunciou condição que não cumpriu, o que caracteriza publicidade enganosa e autoriza o consumidor a exigir o cumprimento da oferta ou a restituição dos valores, com perdas e danos.",
+   pedido:"o cumprimento da oferta ou a restituição dos valores pagos, com perdas e danos"},
+  {id:"c_solidaria", area:"civel", titulo:"Responsabilidade solidária da cadeia de fornecimento", fundamento:"CDC, arts. 7º, parágrafo único, e 25, § 1º",
+   texto:"Todos os que participam da cadeia de fornecimento e auferem proveito econômico com a operação respondem solidariamente pelos danos causados ao consumidor.",
+   pedido:"a condenação solidária das Rés"},
+  {id:"c_moral", area:"civel", titulo:"Dano moral", fundamento:"CF, art. 5º, V e X; CC, arts. 186 e 927; CDC, art. 6º, VI",
+   texto:"A conduta da Ré ultrapassou o mero aborrecimento: frustrou a legítima expectativa do(a) Autor(a), exigiu inúmeras tentativas de solução sem êxito e causou abalo que merece reparação, com caráter compensatório e pedagógico.",
+   pedido:"a condenação ao pagamento de indenização por danos morais"},
+  {id:"c_material", area:"civel", titulo:"Dano material", fundamento:"CC, arts. 402 e 944; CDC, art. 6º, VI",
+   texto:"O(A) Autor(a) suportou prejuízos materiais comprovados pelos documentos anexos, que devem ser integralmente ressarcidos, com correção monetária e juros.",
+   pedido:"a condenação ao ressarcimento dos danos materiais comprovados, com correção e juros"},
+  {id:"c_tutela", area:"civel", titulo:"Tutela de urgência", fundamento:"CPC, art. 300",
+   texto:"Há probabilidade do direito, demonstrada pelos documentos anexos, e perigo de dano, pois a demora agrava o prejuízo do(a) Autor(a). A medida é reversível. Requer a concessão de tutela de urgência.",
+   pedido:"a concessão de tutela de urgência, liminarmente"},
+  {id:"c_gratuidade", area:"civel", titulo:"Justiça gratuita", fundamento:"CPC, arts. 98 e 99, § 3º",
+   texto:"O(A) Autor(a) não pode arcar com as custas e despesas processuais sem prejuízo do próprio sustento, conforme declaração anexa, presumida verdadeira para a pessoa natural.",
+   pedido:"a concessão dos benefícios da justiça gratuita"},
+  {id:"c_cobranca", area:"civel", titulo:"Inadimplemento e cobrança", fundamento:"CC, arts. 389, 394 e 395",
+   texto:"A Ré deixou de pagar a quantia devida no vencimento, conforme documentos anexos, constituindo-se em mora e respondendo pelo valor principal, correção monetária, juros e honorários.",
+   pedido:"a condenação ao pagamento do débito, com correção monetária e juros de mora"},
+  // criminal
+  {id:"p_inepcia", area:"criminal", titulo:"Inépcia da denúncia", fundamento:"CPP, arts. 41 e 395, I",
+   texto:"A denúncia não descreve de forma individualizada a conduta atribuída ao(à) Acusado(a), o que impede o exercício da ampla defesa e impõe a sua rejeição.",
+   pedido:"a rejeição da denúncia por inépcia"},
+  {id:"p_absolvicao", area:"criminal", titulo:"Absolvição sumária", fundamento:"CPP, art. 397",
+   texto:"Os elementos dos autos demonstram, de plano, causa que afasta a responsabilidade penal do(a) Acusado(a), autorizando a absolvição sumária.",
+   pedido:"a absolvição sumária do(a) Acusado(a)"},
+  {id:"p_preventiva", area:"criminal", titulo:"Ausência dos requisitos da preventiva", fundamento:"CPP, arts. 312, 313 e 315",
+   texto:"Não há fundamentos concretos que demonstrem perigo gerado pelo estado de liberdade do(a) Acusado(a), que é primário(a), tem residência fixa e ocupação lícita. A gravidade abstrata do delito não justifica a prisão.",
+   pedido:"a revogação da prisão preventiva"},
+  {id:"p_cautelares", area:"criminal", titulo:"Medidas cautelares diversas da prisão", fundamento:"CPP, arts. 282, § 6º, e 319",
+   texto:"Ainda que se entenda necessária alguma cautela, as medidas do art. 319 do CPP são suficientes e adequadas ao caso, devendo a prisão ser a última opção.",
+   pedido:"subsidiariamente, a substituição da prisão por medidas cautelares diversas"},
+  {id:"p_testemunhas", area:"criminal", titulo:"Produção de provas e rol de testemunhas", fundamento:"CPP, art. 396-A",
+   texto:"A defesa requer a produção de todas as provas admitidas em direito e apresenta o rol de testemunhas abaixo, para intimação.",
+   pedido:"a produção de provas e a intimação das testemunhas arroladas"}
+];
+
+/* ---------------- MODELOS DE PEÇA ---------------- */
+P.MODELOS_PECA = {
+  trab_reclamatoria:{area:"trabalhista", nome:"Reclamação trabalhista", acao:"RECLAMAÇÃO TRABALHISTA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DO TRABALHO DA ___ VARA DO TRABALHO DE {cidade}", autor:"Reclamante", reu:"Reclamada", verbo:"propor a presente", teses:["t_gratuidade_trab","t_verbas","t_horas","t_honor_trab"], pedidosFixos:["a notificação da Reclamada para comparecer à audiência e apresentar defesa, sob pena de revelia e confissão","a procedência dos pedidos, com valores apurados em liquidação, acrescidos de juros e correção monetária","a produção de todas as provas admitidas em direito, especialmente depoimento pessoal, testemunhas e perícia"], liquidos:true},
+  civ_consumidor:{area:"civel", nome:"Indenizatória · consumidor", acao:"AÇÃO INDENIZATÓRIA POR DANOS MORAIS E MATERIAIS", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL / JUIZADO ESPECIAL CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"propor a presente", teses:["c_consumo","c_inversao","c_moral","c_material"], pedidosFixos:["a citação da Ré para, querendo, apresentar defesa","a condenação da Ré ao pagamento das custas processuais e honorários advocatícios","a produção de todas as provas admitidas em direito"]},
+  civ_cobranca:{area:"civel", nome:"Ação de cobrança", acao:"AÇÃO DE COBRANÇA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"propor a presente", teses:["c_cobranca"], pedidosFixos:["a citação da Ré para pagar ou apresentar defesa","a condenação da Ré ao pagamento das custas e honorários advocatícios","a produção de todas as provas admitidas em direito"]},
+  civ_obrigacao:{area:"civel", nome:"Obrigação de fazer com tutela de urgência", acao:"AÇÃO DE OBRIGAÇÃO DE FAZER COM PEDIDO DE TUTELA DE URGÊNCIA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"propor a presente", teses:["c_tutela"], pedidosFixos:["a citação da Ré para cumprir a obrigação e, querendo, apresentar defesa","a fixação de multa diária para o caso de descumprimento","a condenação da Ré ao pagamento das custas e honorários advocatícios","a produção de todas as provas admitidas em direito"]},
+  crim_resposta:{area:"criminal", nome:"Resposta à acusação", acao:"RESPOSTA À ACUSAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CRIMINAL DA COMARCA DE {cidade}", autor:"Acusado(a)", reu:"Ministério Público", verbo:"apresentar, no prazo legal, a sua", teses:["p_inepcia","p_absolvicao","p_testemunhas"], pedidosFixos:[], defesa:true},
+  crim_liberdade:{area:"criminal", nome:"Pedido de revogação da preventiva", acao:"PEDIDO DE REVOGAÇÃO DE PRISÃO PREVENTIVA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CRIMINAL DA COMARCA DE {cidade}", autor:"Acusado(a)", reu:"Ministério Público", verbo:"formular o presente", teses:["p_preventiva","p_cautelares"], pedidosFixos:["a expedição do alvará de soltura"], defesa:true}
+};
+
+/* ---------------- QUALIFICAÇÃO ---------------- */
+P.qualificar = function(c){
+  if(!c) return F("qualificação completa");
+  const d = c.dados || {};
+  if(c.tipo==="PJ") return `<b>${e((c.nome||"").toUpperCase())}</b>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ${val(c.doc,"CNPJ")}, com sede em ${val(d.endereco,"endereço completo")}, neste ato representada por ${val(d.representante,"representante legal")}, e-mail ${val(c.email,"e-mail")}`;
+  return `<b>${e((c.nome||"").toUpperCase())}</b>, ${val(d.nacionalidade,"nacionalidade")}, ${val(d.estado_civil,"estado civil")}, ${val(d.profissao,"profissão")}, portador(a) do RG nº ${val(d.rg,"RG")}, inscrito(a) no CPF sob o nº ${val(c.doc,"CPF")}, residente e domiciliado(a) em ${val(d.endereco,"endereço completo com CEP")}, e-mail ${val(c.email,"e-mail")}`;
+};
+P.advogadosDoc = function(cfgDocs){
+  return String((cfgDocs||{}).advogados||"").split(/\n+/).map(l=>l.trim()).filter(Boolean);
+};
+
+/* ---------------- DOCUMENTO VISUAL LAW (HTML para imprimir/PDF e Word) ---------------- */
+P.docVisual = function(o){
+  const d = o.docs || {}, cor = /^#[0-9a-f]{6}$/i.test(d.cor||"") ? d.cor : "#1f3a2e", ouro = /^#[0-9a-f]{6}$/i.test(d.cor2||"") ? d.cor2 : "#b8924a";
+  const cab = `<table class="topo" width="100%"><tr><td>${d.logo?`<img src="${d.logo}" alt="" style="max-height:54px;max-width:220px">`:`<span class="marca">${e(d.nome||o.escritorio||"")}</span>`}</td><td align="right" class="topo-d">${e(d.nome||o.escritorio||"")}${d.oab?`<br>${e(d.oab)}`:""}</td></tr></table><div class="faixa"></div>`;
+  const rod = `<div class="rodape">${[d.endereco, d.telefone, d.email].filter(Boolean).map(e).join(" · ")}</div>`;
+  return `<!DOCTYPE html><html lang="pt-BR" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${e(o.titulo||"Documento")}</title>
+<style>
+@page{size:A4;margin:22mm 20mm 20mm 22mm}
+body{font-family:Georgia,"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#1d1d1b;margin:0;padding:24px;background:#fff}
+.doc{max-width:760px;margin:0 auto}
+.topo td{vertical-align:middle;border:0;padding:0}.marca{font-family:Arial,sans-serif;font-weight:bold;font-size:15pt;color:${cor};letter-spacing:.04em}
+.topo-d{font-family:Arial,sans-serif;font-size:8.5pt;color:#6b6b66}
+.faixa{height:4px;background:${cor};border-bottom:2px solid ${ouro};margin:10px 0 22px}
+h1{font-family:Arial,sans-serif;font-size:15pt;text-align:center;color:${cor};margin:6px 0 2px;letter-spacing:.03em}
+.sub{text-align:center;font-family:Arial,sans-serif;font-size:9pt;color:${ouro};letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px}
+.juizo{font-weight:bold;text-transform:uppercase;margin:0 0 34px}
+p{margin:0 0 12px;text-align:justify;text-indent:2.2em}
+p.ni{text-indent:0}
+h2{font-family:Arial,sans-serif;font-size:11pt;color:#fff;background:${cor};padding:6px 12px;margin:26px 0 12px;letter-spacing:.04em;text-transform:uppercase}
+h3{font-family:Arial,sans-serif;font-size:11pt;color:${cor};margin:18px 0 8px;border-left:4px solid ${ouro};padding-left:9px}
+.box{border:1px solid #d9d2c3;background:#f7f3ea;padding:12px 14px;margin:12px 0 16px}
+.box b.t{display:block;font-family:Arial,sans-serif;font-size:8.5pt;letter-spacing:.12em;text-transform:uppercase;color:${ouro};margin-bottom:4px}
+.partes{width:100%;border-collapse:collapse;margin:8px 0 16px}.partes td{width:50%;vertical-align:top;border:1px solid #d9d2c3;padding:10px 12px;font-size:10.5pt;line-height:1.45}
+.partes .r{font-family:Arial,sans-serif;font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:${ouro};display:block;margin-bottom:4px}
+.fund{font-family:Arial,sans-serif;font-size:8.5pt;color:${cor};background:#eef2ef;border-left:3px solid ${cor};padding:5px 10px;margin:-4px 0 14px}
+.crono{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:10.5pt}.crono td{border-bottom:1px solid #e3ddcf;padding:6px 8px;vertical-align:top}
+.crono td.dt{width:110px;font-family:Arial,sans-serif;font-weight:bold;color:#fff;background:${cor};text-align:center;white-space:nowrap}
+.ped{margin:0 0 14px;padding-left:22px}.ped li{margin:0 0 6px;text-align:justify}
+.tab{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:10.5pt}.tab th{background:${cor};color:#fff;font-family:Arial,sans-serif;font-size:9pt;text-align:left;padding:6px 8px}.tab td{border-bottom:1px solid #e3ddcf;padding:6px 8px}
+.cards{width:100%;border-collapse:separate;border-spacing:8px 0;margin:6px 0 16px}.cards td{background:${cor};color:#fff;text-align:center;padding:10px 6px;font-family:Arial,sans-serif;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase}.cards td b{display:block;font-size:12.5pt;letter-spacing:0;text-transform:none;margin-top:3px}
+.passos{width:100%;border-collapse:collapse;margin:4px 0 18px}.passos td{text-align:center;font-family:Arial,sans-serif;font-size:8.5pt;color:#555;padding:4px}.passos .n{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:${ouro};color:#fff;font-weight:bold}
+.destaque{border:1px solid ${ouro};background:#fbf6ec;padding:10px 14px;margin:10px 0 16px;font-family:Arial,sans-serif;font-size:10pt;text-align:center;color:${cor};font-weight:bold}
+.ass{margin:46px auto 0;text-align:center;width:70%}.ass .l{border-top:1px solid #1d1d1b;padding-top:6px;font-family:Arial,sans-serif;font-size:10pt}
+.ass2{width:100%;margin-top:40px}.ass2 td{width:50%;text-align:center;padding:30px 10px 0;font-family:Arial,sans-serif;font-size:9.5pt}.ass2 .l{border-top:1px solid #1d1d1b;padding-top:5px}
+.local{text-align:right;margin-top:26px}
+.preencher{background:#ffe9a8;color:#6b4b00;font-family:Arial,sans-serif;font-size:.9em;padding:0 3px}
+.rodape{margin-top:40px;border-top:1px solid #e3ddcf;padding-top:8px;font-family:Arial,sans-serif;font-size:8pt;color:#8a857a;text-align:center}
+@media print{body{padding:0}.preencher{background:#ffe9a8 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}h2,.crono td.dt,.cards td,.tab th,.faixa,.passos .n{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body><div class="doc">${cab}${o.corpo}${rod}</div></body></html>`;
+};
+const paragrafos = t => String(t||"").split(/\n\s*\n|\n/).map(s=>s.trim()).filter(Boolean).map(s=>`<p>${e(s)}</p>`).join("");
+const hojeExtenso = () => new Date().toLocaleDateString("pt-BR",{day:"numeric", month:"long", year:"numeric"});
+P.cronologia = function(txt){
+  return String(txt||"").split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>{ const m = l.match(/^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*[-–—:]\s*(.+)$/); return m ? [m[1], m[2]] : ["", l]; });
+};
+
+/* Petição / peça */
+P.montarPeca = function(o){
+  const M = P.MODELOS_PECA[o.modelo]; if(!M) return "";
+  const cidade = o.cidade || "";
+  const juizo = (o.juizo || M.juizo).replace("{cidade}", cidade ? cidade.toUpperCase() : "___");
+  const qualiCli = P.qualificar(o.cliente);
+  const contra = o.contraria ? `<b>${e(o.contraria.toUpperCase())}</b>${o.contrariaQuali?", "+e(o.contrariaQuali):`, ${F("qualificação da parte contrária (CPF/CNPJ e endereço)")}`}` : F("parte contrária e qualificação");
+  const adv = o.advogado ? e(o.advogado) : F("advogado(a) e OAB");
+  const teses = o.teses || [];
+  const crono = P.cronologia(o.cronologia);
+  const pedidos = [].concat(teses.map(t=>t.pedido).filter(Boolean), o.pedidos || []);
+  let c = `<p class="juizo ni">${e(juizo)}</p>`;
+  if(o.numero) c += `<p class="ni"><b>Processo nº ${e(o.numero)}</b></p>`;
+  c += `<p class="ni">${qualiCli}, por seu(sua) advogado(a) que esta subscreve (procuração anexa), vem, respeitosamente, à presença de Vossa Excelência, ${e(M.verbo)}</p>`;
+  c += `<h1>${e(M.acao)}</h1><div class="sub">${M.defesa?"":"em face de"}</div>`;
+  if(!M.defesa) c += `<p class="ni">${contra}, pelos fatos e fundamentos a seguir expostos.</p>`;
+  else c += `<p class="ni">nos autos da ação penal movida pelo <b>MINISTÉRIO PÚBLICO</b>, pelos fatos e fundamentos a seguir expostos.</p>`;
+  c += `<table class="partes"><tr><td><span class="r">${e(M.autor)}</span>${e(o.cliente?.nome||"")||F("cliente")}</td><td><span class="r">${e(M.reu)}</span>${M.defesa?"Ministério Público":(e(o.contraria||"")||F("parte contrária"))}</td></tr></table>`;
+  c += `<div class="box"><b class="t">Resumo do caso</b>${e(o.resumo||"") || F("em duas ou três linhas, o que aconteceu e o que se pede")}</div>`;
+  c += `<h2>I. Dos fatos</h2>${paragrafos(o.fatos) || `<p>${F("narre os fatos em ordem, com datas e documentos")}</p>`}`;
+  if(crono.length) c += `<h3>Linha do tempo</h3><table class="crono">${crono.map(([d,t])=>`<tr><td class="dt">${e(d||"—")}</td><td>${e(t)}</td></tr>`).join("")}</table>`;
+  if(o.citacao) c += `<div class="destaque">“${e(o.citacao)}”</div>`;
+  c += `<h2>II. Do direito</h2>`;
+  teses.forEach(t=>{ c += `<h3>${e(t.titulo)}</h3>${paragrafos(t.texto)}${t.fundamento?`<div class="fund">Fundamento: ${e(t.fundamento)}</div>`:""}`; });
+  if(!teses.length) c += `<p>${F("fundamentos jurídicos")}</p>`;
+  c += `<h2>III. Dos pedidos</h2><p class="ni">Diante do exposto, requer:</p><ol class="ped" type="a">${pedidos.concat(M.pedidosFixos||[]).map(p=>`<li>${e(p.charAt(0).toLowerCase()+p.slice(1))};</li>`).join("")}</ol>`;
+  if(M.liquidos && (o.valores||[]).length) c += `<table class="tab"><tr><th>Pedido</th><th style="width:140px">Valor estimado</th></tr>${o.valores.map(([p,v])=>`<tr><td>${e(p)}</td><td>${e(v)||F("R$")}</td></tr>`).join("")}</table>`;
+  if(M.defesa && teses.some(t=>t.id==="p_testemunhas")) c += `<h3>Rol de testemunhas</h3><p class="ni">${o.testemunhas?e(o.testemunhas).replace(/\n/g,"<br>"):F("nome, qualificação e endereço de cada testemunha")}</p>`;
+  if(!M.defesa) c += `<p class="ni">Dá-se à causa o valor de <b>${o.valorCausa?e(o.valorCausa):F("R$ valor da causa")}</b>.</p>`;
+  c += `<p class="ni">Termos em que pede deferimento.</p><p class="local">${e(cidade||"")||F("cidade")}, ${hojeExtenso()}.</p><div class="ass"><div class="l">${adv}</div></div>`;
+  return P.docVisual({docs:o.docs, escritorio:o.escritorio, titulo:M.nome, corpo:c});
+};
+
+/* Contrato de honorários */
+P.montarContrato = function(o){
+  const d = o.docs || {}, h = o.honorarios || {};
+  const cards = [["Honorários fixos", h.fixo||"—"],["Entrada", h.entrada||"—"],["Parcelas", h.parcelas||"—"],["Êxito", h.exito?h.exito+"%":"—"]];
+  let c = `<h1>CONTRATO DE HONORÁRIOS ADVOCATÍCIOS</h1><div class="sub">Prestação de serviços jurídicos</div>`;
+  c += `<p class="ni"><b>CONTRATANTE:</b> ${P.qualificar(o.cliente)}.</p>`;
+  c += `<p class="ni"><b>CONTRATADA:</b> <b>${e((d.nome||o.escritorio||"").toUpperCase())}</b>${d.cnpj?`, inscrita no CNPJ sob o nº ${e(d.cnpj)}`:""}${d.oab?`, registro ${e(d.oab)}`:""}, com sede em ${val(d.endereco,"endereço do escritório")}, e-mail ${val(d.email,"e-mail")}, neste ato representada por ${o.advogados&&o.advogados.length?e(o.advogados.join("; ")):F("advogado(a) e OAB")}.</p>`;
+  c += `<p class="ni">As partes acima identificadas têm, entre si, justo e acertado o presente contrato, que se regerá pelas cláusulas seguintes:</p>`;
+  c += `<table class="cards"><tr>${cards.map(([k,v])=>`<td>${e(k)}<b>${e(v)}</b></td>`).join("")}</tr></table>`;
+  c += `<table class="passos"><tr>${["Assinatura","Documentos","Ajuizamento","Acompanhamento"].map((t,i)=>`<td><span class="n">${i+1}</span><br>${t}</td>`).join("")}</tr></table>`;
+  const cl = [
+    ["Do objeto", `A CONTRATADA prestará ao CONTRATANTE os serviços de advocacia consistentes em: ${o.objeto?e(o.objeto):F("descrever o serviço: ex. ajuizamento e acompanhamento de ação indenizatória contra ...")}, em todas as instâncias ordinárias, salvo disposição em contrário.`],
+    ["Dos honorários", `Pelos serviços, o CONTRATANTE pagará à CONTRATADA ${h.fixo?`honorários fixos de <b>${e(h.fixo)}</b>`:"honorários fixos de "+F("valor")}${h.entrada?`, sendo <b>${e(h.entrada)}</b> de entrada`:""}${h.parcelas?` e o saldo em <b>${e(h.parcelas)}</b>`:""}${h.exito?`, além de honorários de êxito de <b>${e(h.exito)}%</b> sobre o proveito econômico obtido pelo CONTRATANTE, devidos no recebimento`:""}. Forma de pagamento: ${h.forma?e(h.forma):F("PIX, boleto ou transferência")}.`],
+    ["Das despesas", "Custas, emolumentos, perícias, cópias, deslocamentos e demais despesas necessárias ao andamento do caso correm por conta do CONTRATANTE, mediante prévia comunicação."],
+    ["Dos honorários de sucumbência", "Os honorários de sucumbência pertencem exclusivamente à CONTRATADA e não se compensam com os honorários contratados (Lei 8.906/94, arts. 22 e 23)."],
+    ["Das obrigações do contratante", "O CONTRATANTE se compromete a fornecer, com veracidade e no prazo solicitado, as informações e os documentos necessários, e a comunicar mudança de endereço, telefone ou e-mail."],
+    ["Da rescisão", "O contrato poderá ser rescindido por qualquer das partes mediante comunicação escrita. Em caso de revogação do mandato sem culpa da CONTRATADA, serão devidos os honorários proporcionais aos serviços prestados e, havendo êxito posterior, a parcela correspondente."],
+    ["Do sigilo e dados pessoais", "A CONTRATADA manterá sigilo sobre as informações recebidas e tratará os dados pessoais do CONTRATANTE apenas para a execução deste contrato e o cumprimento de obrigações legais (Lei 13.709/18)."],
+    ["Do foro", `Fica eleito o foro da comarca de ${val(o.cidade,"cidade")} para dirimir questões oriundas deste contrato.`]
+  ];
+  c += cl.map(([t,x],i)=>`<h3>Cláusula ${i+1}ª — ${e(t)}</h3><p>${x}</p>`).join("");
+  c += `<p class="ni">E, por estarem assim justos e contratados, assinam o presente em duas vias de igual teor.</p><p class="local">${val(o.cidade,"cidade")}, ${hojeExtenso()}.</p>`;
+  c += `<table class="ass2"><tr><td><div class="l">${e(o.cliente?.nome||"CONTRATANTE")}<br>Contratante</div></td><td><div class="l">${e(d.nome||o.escritorio||"CONTRATADA")}<br>Contratada</div></td></tr><tr><td><div class="l">Testemunha 1 · CPF</div></td><td><div class="l">Testemunha 2 · CPF</div></td></tr></table>`;
+  return P.docVisual({docs:d, escritorio:o.escritorio, titulo:"Contrato de honorários", corpo:c});
+};
+
+/* Procuração */
+P.PODERES_ESPECIAIS = ["receber citação","confessar","reconhecer a procedência do pedido","transigir","desistir","renunciar ao direito sobre o qual se funda a ação","receber e dar quitação","firmar compromisso","assinar declaração de hipossuficiência econômica"];
+P.montarProcuracao = function(o){
+  const d = o.docs || {};
+  const outorgados = (o.advogados||[]).length ? o.advogados.map(a=>`<li>${e(a)}</li>`).join("") : `<li>${F("nome do(a) advogado(a), OAB/UF nº, e-mail")}</li>`;
+  let c = `<h1>PROCURAÇÃO</h1><div class="sub">Ad judicia et extra</div>`;
+  c += `<div class="box"><b class="t">Outorgante</b>${P.qualificar(o.cliente)}.</div>`;
+  c += `<div class="box"><b class="t">Outorgados</b><ul style="margin:4px 0 0;padding-left:18px">${outorgados}</ul>${d.nome?`<div style="margin-top:6px">integrantes de <b>${e(d.nome)}</b>${d.cnpj?`, CNPJ ${e(d.cnpj)}`:""}${d.endereco?`, com escritório em ${e(d.endereco)}`:""}${d.email?`, e-mail ${e(d.email)}`:""}.</div>`:""}</div>`;
+  c += `<h2>Dos poderes</h2><p>Pelo presente instrumento, o(a) OUTORGANTE nomeia e constitui seus bastantes procuradores os OUTORGADOS acima, a quem confere os poderes da cláusula <b>ad judicia et extra</b>, para o foro em geral, podendo propor e contestar ações, recorrer, acompanhar processos em qualquer juízo, instância ou tribunal, e praticar todos os atos necessários ao fiel cumprimento deste mandato, inclusive substabelecer com ou sem reserva de poderes.</p>`;
+  const esp = o.especiais || [];
+  if(esp.length) c += `<p>Confere ainda os <b>poderes especiais</b> para ${esp.map(e).join(", ")}, nos termos do art. 105 do Código de Processo Civil.</p>`;
+  c += `<h3>Finalidade</h3><p>${o.finalidade?e(o.finalidade):F("ex.: propor ação indenizatória contra ... e acompanhá-la até o final")}.</p>`;
+  c += `<p class="local">${val(o.cidade,"cidade")}, ${hojeExtenso()}.</p><div class="ass"><div class="l">${e(o.cliente?.nome||"OUTORGANTE")}<br>Outorgante</div></div>`;
+  return P.docVisual({docs:d, escritorio:o.escritorio, titulo:"Procuração", corpo:c});
+};
+
+/* exportações */
+P.baixarWord = function(html, nome){
+  const blob = new Blob(["﻿", html], {type:"application/msword"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome.replace(/[\\/:*?"<>|]+/g,"-") + ".doc"; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+};
+P.textoSimples = function(html){ const d = document.createElement("div"); d.innerHTML = html.replace(/<style[\s\S]*?<\/style>/i,""); d.querySelectorAll("p,h1,h2,h3,li,tr,div").forEach(n=>n.insertAdjacentText("afterend","\n")); return d.innerText.replace(/\n{3,}/g,"\n\n").trim(); };
+P.mensagemDocs = function(nome, faltam, escritorio){
+  const pn = String(nome||"").trim().split(/\s+/)[0] || "";
+  return `Olá${pn?", "+pn:""}! Para darmos andamento ao seu caso, faltam só estes documentos:\n\n${faltam.map((x,i)=>`${i+1}. ${x}`).join("\n")}\n\nPode mandar por aqui mesmo, em foto ou PDF. Qualquer dúvida, estamos à disposição.${escritorio?"\n\n"+escritorio:""}`;
+};
+})(window.Pauta);

@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 const P = window.Pauta;
-const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes"];
+const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos"];
 P.TABELAS = TABELAS;
 const agora = () => new Date().toISOString();
 const base = () => location.origin + location.pathname;
@@ -71,6 +71,7 @@ P.criarSupabase = function(url, chave){
     async pedidos(){ return []; },
     async convites(){ return ok(await sb.from("convites").select("*").order("criado_em", {ascending:false})) || []; },
     async daily(){ const {data, error} = await sb.functions.invoke("noticias", {body:{}}); if(error) throw error; return data && data.itens ? [edicao(data)] : []; },
+    async radar(tema){ const url = "https://news.google.com/rss/search?q=" + encodeURIComponent(tema) + "+when:7d&hl=pt-BR&gl=BR&ceid=BR:pt-419"; const {data, error} = await sb.functions.invoke("noticias", {body:{fontes:[{fonte:"Radar", area:"tribunais", url}]}}); if(error) throw error; return ((data && data.itens) || []).slice(0, 8).map(i=>({titulo:i.titulo, link:i.link, fonte:i.fonte, data:i.data})); },
     async prefs(){ return null; }, async salvarPrefs(){}
   };
   return api;
@@ -114,7 +115,7 @@ P.criarDemo = function(){
       {id:"d1", processo_id:PR.p1, nome:"Procuração", status:"Assinado", data:d(-90), visivel_cliente:true},
       {id:"d3", processo_id:PR.p2, nome:"Notas fiscais e fotos da mercadoria", status:"Aguardando cliente", data:d(-5), visivel_cliente:true}
     ],
-    tarefas:[], revisoes:[], comunicacoes:[]
+    tarefas:[], revisoes:[], comunicacoes:[], modelos:[{id:"md1", tipo:"tema", area:"", titulo:"dano moral atraso de voo", texto:""}]
   };
   const r1 = P.calcPrazo({inicio:d(-6), dias:15, contagem:"uteis", djen:false, suspende:true});
   db.tarefas = [
@@ -149,6 +150,7 @@ P.criarDemo = function(){
     async portal(){ const p = db.perfis.find(x=>x.id===me); if(!p || !p.cliente_id) return {vinculado:false, escritorio:db.esc.nome}; const c = db.clientes.find(x=>x.id===p.cliente_id); return P.montarPortal({escritorio:db.esc, cliente:Object.assign({}, c, {portal_perm:p.permissoes}), processos:db.processos, andamentos:db.andamentos, documentos:db.documentos, tarefas:db.tarefas}); },
     async salvarPortal(){}, async removerPortal(){}, async pedidos(){ return []; },
     async convites(){ return db.convites.slice(); },
+    async radar(tema){ return [{titulo:`Exemplo: tribunal julga caso sobre ${tema}`, link:"https://www.jusbrasil.com.br/jurisprudencia/busca?q="+encodeURIComponent(tema), fonte:"Demonstração", data:agora()}]; },
     async daily(){ return [{id:P.hoje(), geradoEm:agora(), demo:true, itens:[
       {titulo:"Exemplo: tribunal fixa tese sobre tema trabalhista", resumo:"Com o Supabase configurado, esta coluna traz as manchetes do STJ, Consultor Jurídico, Migalhas e notícias por área.", fonte:"Demonstração", link:"", area:"trabalhista", areas:["trabalhista"]},
       {titulo:"Exemplo: decisão sobre direito do consumidor", resumo:"Cada notícia mostra a fonte e abre a matéria original.", fonte:"Demonstração", link:"", area:"civel", areas:["civel"]}]}]; },
