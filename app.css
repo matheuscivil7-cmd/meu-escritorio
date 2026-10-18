@@ -658,3 +658,13 @@ code{font-family:var(--f-mono);font-size:.85em;background:var(--surface-3);paddi
 input.vazio,textarea.vazio{border-color:var(--warn)!important;background:color-mix(in srgb,var(--warn) 8%,var(--surface))}
 @media (max-width:900px){.cfg-grid,.cfg-doc{grid-template-columns:minmax(0,1fr)}.cfg-grid > .panel:nth-child(2){grid-row:auto}.passos-cfg{grid-template-columns:minmax(0,1fr)}.cfg-prev{position:static}.cfg-prev iframe{height:520px}}
 .campo-k{font-size:.72rem;background:transparent;color:var(--muted);padding:0;margin-left:4px}
+/* logo do escritório sem distorção (portal do cliente e formulário público) */
+.logo-esc{display:block;align-self:flex-start;flex:none;width:auto!important;height:auto!important;max-width:min(260px,100%);max-height:72px;object-fit:contain;background:#fff;border-radius:10px;padding:6px 10px;margin-bottom:6px;box-sizing:content-box}
+/* menu lateral: rola quando não cabe na tela */
+.rail{overflow:hidden}
+.rail .navlist{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding-left:15px;margin-left:-15px;padding-right:4px;margin-right:-4px;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.rail .navlist::-webkit-scrollbar{width:6px}.rail .navlist::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:6px}
+.rail .navlist .ind{left:15px;right:4px}
+.rail-foot{margin-top:0;flex:none}
+@media (max-height:820px){.rail{gap:14px;padding-block:14px}.rail .navbtn{height:38px}}
+.rail .navlist > .navbtn{flex:none}

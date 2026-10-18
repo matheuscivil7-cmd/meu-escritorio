@@ -190,7 +190,7 @@ P.criarDemo = function(){
 /* portal: usado pela demonstração */
 P.montarPortal = function({escritorio, cliente, processos, andamentos, documentos, tarefas, perfis}){
   const perm = cliente.portal_perm || {ver_documentos:true, ver_audiencias:true};
-  return {vinculado:true, escritorio:escritorio?.nome||"", escritorio_id:escritorio?.id, contato:{telefone:"(11) 4000-1000", email:"contato@limareis.adv.br"}, cliente:cliente.nome,
+  return {vinculado:true, escritorio:escritorio?.nome||"", escritorio_id:escritorio?.id, logo:((escritorio?.config||{}).docs||{}).logo||"", contato:{telefone:"(11) 4000-1000", email:"contato@limareis.adv.br"}, cliente:cliente.nome,
     processos: processos.filter(p=>p.cliente_id===cliente.id).map(p=>({id:p.id, numero:p.numero||"", area:p.area, fase:p.fase||"", vara:p.vara||"", parte_contraria:p.parte_contraria||"", resumo:p.resumo_cliente||"", atualizado_em:p.atualizado_em||"", advogado:(()=>{ const a = (perfis||[]).find(u=>u.id===p.responsavel_id); return a ? {nome:a.nome, email:a.email, telefone:a.telefone||"(11) 98888-1234"} : null; })(),
       andamentos: andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(a=>({data:a.data, texto:a.texto, arquivo:a.arquivo||null, arquivo_nome:a.arquivo_nome||null})),
       documentos: perm.ver_documentos===false ? [] : documentos.filter(x=>x.processo_id===p.id && x.visivel_cliente).map(x=>({id:x.id, nome:x.nome, status:x.status, data:x.data, arquivo:!!x.arquivo, caminho:x.arquivo||null})),

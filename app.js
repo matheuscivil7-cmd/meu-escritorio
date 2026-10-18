@@ -396,7 +396,8 @@ function render(dados){
 function moverInd(cont, alvo){
   const ind = cont && cont.querySelector(":scope > .ind"); if(!ind) return;
   if(!alvo){ ind.style.opacity = 0; return; }
-  if(cont.classList.contains("navlist")){ ind.style.transform = `translateY(${alvo.offsetTop}px)`; ind.style.height = alvo.offsetHeight+"px"; }
+  if(cont.classList.contains("navlist")){ ind.style.transform = `translateY(${alvo.offsetTop}px)`; ind.style.height = alvo.offsetHeight+"px";
+    if(alvo.offsetTop < cont.scrollTop) cont.scrollTop = alvo.offsetTop - 8; else if(alvo.offsetTop + alvo.offsetHeight > cont.scrollTop + cont.clientHeight) cont.scrollTop = alvo.offsetTop + alvo.offsetHeight - cont.clientHeight + 8; }
   else { ind.style.transform = `translateX(${alvo.offsetLeft}px)`; ind.style.width = alvo.offsetWidth+"px"; }
   ind.style.opacity = 1;
 }
@@ -1310,7 +1311,7 @@ function vPortal(){
       <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="pn-${p.id}" placeholder="Enviar outro documento: escreva o nome" style="flex:1"><label class="btn">${ICON.plus}Arquivo<input type="file" hidden data-file="portal-novo" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>
       <button class="linkbtn small" data-act="pdf-portal" data-id="${p.id}" style="align-self:flex-start">Baixar resumo em PDF</button>
     </div></div>`; };
-  return `<div class="portal-hero">${pt.logo?`<img src="${pt.logo}" alt="" style="max-height:44px;max-width:200px;background:#fff;border-radius:8px;padding:4px;margin-bottom:6px">`:`<span class="small gold" style="text-transform:uppercase;letter-spacing:.12em;font-weight:600">${esc(pt.escritorio)}</span>`}
+  return `<div class="portal-hero">${pt.logo?`<img class="logo-esc" src="${pt.logo}" alt="${esc(pt.escritorio||"")}">`:`<span class="small gold" style="text-transform:uppercase;letter-spacing:.12em;font-weight:600">${esc(pt.escritorio)}</span>`}
     <h1>Olá, ${esc(P.primeiroNome(pt.cliente||S.perfil.nome))}</h1>
     <div class="portal-kpis"><div><b>${ps.length}</b><span>processo(s)</span></div><div><b>${auds[0]?fmtCurto(auds[0].data):"—"}</b><span>próxima audiência</span></div><div class="${pend.length?"alerta":""}"><b>${pend.length}</b><span>documento(s) para enviar</span></div></div></div>
     <div class="portal-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">${ps.length?ps.map(card).join(""):`<div class="panel"><div class="empty"><p>Nenhum processo vinculado ao seu cadastro.</p></div></div>`}</div><div class="portal-lado">${contatos}
@@ -1402,7 +1403,7 @@ function formAtendimento(){
   const a = L.atend || {}, e = a.esc || {};
   if(a.enviado) return `<div class="login-card" style="max-width:520px"><h1>Recebemos seu contato</h1><p class="muted" style="margin:0">Obrigado, ${esc(P.primeiroNome(a.nome||""))}. A equipe do ${esc(e.nome||"escritório")} vai retornar em breve pelo telefone ou e-mail informado.</p></div>`;
   if(!e.nome) return `<div class="login-card" style="max-width:520px"><h1>Formulário indisponível</h1><p class="muted" style="margin:0">Este link não corresponde a nenhum escritório. Confira o endereço recebido.</p></div>`;
-  return `<div class="login-card" style="max-width:560px">${e.logo?`<img src="${e.logo}" alt="" style="max-height:48px;max-width:220px;background:#fff;border-radius:8px;padding:4px">`:""}<span class="ia-tag">${esc(e.nome)}</span><h1>Conte seu caso</h1><p class="muted" style="margin:0">Descreva o que aconteceu. A equipe analisa e entra em contato. As informações são confidenciais.</p>
+  return `<div class="login-card" style="max-width:560px">${e.logo?`<img class="logo-esc" src="${e.logo}" alt="${esc(e.nome||"")}">`:""}<span class="ia-tag">${esc(e.nome)}</span><h1>Conte seu caso</h1><p class="muted" style="margin:0">Descreva o que aconteceu. A equipe analisa e entra em contato. As informações são confidenciais.</p>
     <form id="f-atendimento" class="auth-card" style="gap:12px">
       <label class="f">Seu nome<input type="text" id="at-nome" required autocomplete="name"></label>
       <div class="grid2"><label class="f">Celular / WhatsApp<input type="tel" id="at-tel" autocomplete="tel" placeholder="(11) 90000-0000"></label><label class="f">E-mail<input type="email" id="at-email" autocomplete="email"></label></div>
