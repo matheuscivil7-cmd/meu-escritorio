@@ -35,13 +35,18 @@ const ICON = {
   cnj: sv('<path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/>'),
   paleta: sv('<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2a4.6 4.6 0 0 0 4.6-4.6C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/>'),
   arrowL: sv('<path d="M19 12H5M11 6l-6 6 6 6"/>','stroke-width="2.2"'),
+  painel: sv('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  financeiro: sv('<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>'),
+  atendimentos: sv('<path d="M4 5h16v11H8l-4 3.5z"/><path d="M8 9.5h8M8 12.5h5"/>'),
+  calculadoras: sv('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h1M11.5 11h1M15 11h1M8 14.5h1M11.5 14.5h1M15 14.5h1M8 18h1M11.5 18h4.5"/>'),
+  calc: sv('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h1M11.5 11h1M15 11h1M8 14.5h1M11.5 14.5h1M15 14.5h1M8 18h1M11.5 18h4.5"/>'),
   pecas: sv('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15.5h5M4 7v14h11" />'),
   direito: sv('<path d="M12 3v18M7 21h10M4 7h16M4 7l-2.5 6a3 3 0 0 0 5 0zM20 7l-2.5 6a3 3 0 0 0 5 0z"/>'),
   ajustes: sv('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>')
 };
 
 /* ---------- estado ---------- */
-const S = {perfil:null, escritorio:null, perfis:[], clientes:[], processos:[], andamentos:[], documentos:[], tarefas:[], revisoes:[], comunicacoes:[], modelos:[], portal:null, daily:[], pedidos:[]};
+const S = {perfil:null, escritorio:null, perfis:[], clientes:[], processos:[], andamentos:[], documentos:[], tarefas:[], revisoes:[], comunicacoes:[], modelos:[], financeiro:[], atendimentos:[], portal:null, daily:[], pedidos:[]};
 const RAW = {};
 let api = null, view = "inicio", ultimaView = "", filtroArea = "todas", busca = "", verConcluidas = false, escopoAgenda = "todos", modal = null;
 const M = {arquivo:"", texto:"", itens:[], lado:"", destinatario:"", titulo:"", colar:"", quem:"cliente", tom:"equilibrado", carregando:false, erro:"", ia:false, resumo:""};
@@ -76,7 +81,11 @@ async function iniciar(){
   api = (cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase) ? P.criarSupabase(cfg.supabaseUrl, cfg.supabaseAnonKey) : P.criarDemo();
   envolverApi();
   api.aoMudarAuth((ev)=>{ if(ev==="PASSWORD_RECOVERY") abrirModal({kind:"novaSenha"}); });
-  const tok = new URLSearchParams(location.search).get("convite");
+  const prm = new URLSearchParams(location.search);
+  L.portalMode = prm.has("portal");
+  const codAt = prm.get("atendimento");
+  if(codAt){ let e = null; try{ e = await api.rpc("escritorio_publico", {c:codAt}); }catch(_){ } L.atend = {codigo:codAt, esc:e||{}}; }
+  const tok = prm.get("convite");
   if(tok){ L.token = tok; try{ L.convite = await api.verConvite(tok); }catch(e){ L.convite = null; } if(!L.convite) L.convite = {invalido:true}; }
   api.daily().then(d=>{ S.daily = d||[]; if(!S.perfil || !$("#main")) mostrarInicio(); else if(view==="daily") render(); }).catch(()=>{ S.daily = []; });
   await identificar();
@@ -92,9 +101,10 @@ async function identificar(){
   S.perfil = r.perfil && !bloqueado ? r.perfil : null;
   L.motivo = bloqueado ? "bloqueado" : (r.motivo||""); L.erro = r.erro||"";
   L.carregando = false; mostrarInicio();
+  if(S.perfil && ehCliente() && !L.atend) await entrarNoApp();
 }
 async function entrarNoApp(){
-  if(!S.perfil) return;
+  if(!S.perfil || L.entrando) return;
   if(L.token){ L.token = ""; L.convite = null; history.replaceState(null, "", location.pathname); }
   L.entrando = true; mostrarInicio();
   if(ehCliente()){ try{ S.portal = await api.portal(); }catch(e){ S.portal = null; } view = "portal"; L.entrando = false; montarShell(); render(); return; }
@@ -106,7 +116,7 @@ async function entrarNoApp(){
   montarShell(); render();
 }
 function voltarAoInicio(){ fecharModal(); view = "inicio"; ultimaView = ""; L.pane = "entrar"; L.ferramenta = ""; mostrarInicio(); window.scrollTo(0,0); }
-async function sairDaConta(){ fecharModal(); try{ await api.sair(); }catch(e){} S.perfil = null; L.tela = "entrar"; L.msg = ""; view = "inicio"; await identificar(); }
+async function sairDaConta(){ if(ehCliente()) L.portalMode = true; fecharModal(); try{ await api.sair(); }catch(e){} S.perfil = null; L.tela = "entrar"; L.msg = ""; view = "inicio"; await identificar(); }
 function filtrar(){
   const me = meuId(), todos = pode("ver_todos_processos"), agenda = pode("ver_agenda_equipe");
   S.perfis = (RAW.perfis||[]).slice();
@@ -123,6 +133,8 @@ function filtrar(){
   S.revisoes = pode("revisar_minutas") ? (RAW.revisoes||[]) : [];
   S.comunicacoes = pode("enviar_cliente") ? (RAW.comunicacoes||[]) : [];
   S.modelos = (RAW.modelos||[]).slice();
+  S.financeiro = pode("financeiro") ? (RAW.financeiro||[]) : [];
+  S.atendimentos = (pode("atendimentos")||pode("gerenciar_clientes")) ? (RAW.atendimentos||[]) : [];
 }
 async function recarregar(t, silencioso){
   if(t==="escritorios"){ const r = await api.meuPerfil().catch(()=>null); if(r && r.escritorio){ S.escritorio = r.escritorio; P.escritorio = r.escritorio; } if(!silencioso) agendarRender(true); return; }
@@ -170,19 +182,21 @@ const FERRAMENTAS = [
   ["direito","Direito geral","Jurisprudência, súmulas, temas e leis","gavel"],
   ["prazos","Calculadora de prazos","CPC, CLT e CPP com feriados","agenda"],
   ["cnj","Conferir número de processo","Valida e identifica o tribunal","cnj"],
-  ["documento","Ler documento","Acha prazos, audiências e números no PDF ou Word","scan"]
+  ["documento","Ler documento","Acha prazos, audiências e números no PDF ou Word","scan"],
+  ["calculadoras","Calculadoras","Atualização de valores e verbas rescisórias","calc"]
 ];
 function mostrarInicio(){
   const ativo = L.ferramenta;
   const tabs = [["entrar","Entrar","inicio"],["ferramentas","Ferramentas","mais"],["daily","Daily","daily"]];
   const paneAtual = L.pane==="ferramenta" ? "ferramentas" : L.pane;
-  $("#root").innerHTML = `<div class="landing" data-pane="${L.pane}">
+  const soLogin = !!(L.atend || L.portalMode || (L.convite && L.convite.papel==="cliente"));
+  $("#root").innerHTML = `<div class="landing${soLogin?" so-login":""}" data-pane="${soLogin?"entrar":L.pane}">
     <header class="land-top"><div class="brand"><div class="logo">§</div><div><b>Pauta</b><small>${esc(S.escritorio?.nome || "Jurídica")}</small></div></div>
       <div class="row">${S.perfil && !L.carregando ? `<button class="btn primary" data-act="entrar" ${L.entrando?"disabled":""}>${L.entrando?`<span class="spinner"></span>`:ehCliente()?"Meus processos":"Entrar"}</button>`:""}<button class="icon-btn" data-act="aparencia" aria-label="Aparência" title="Aparência">${ICON.paleta}</button></div></header>
     <aside class="land-tools"><h3>Use sem entrar</h3>
       ${FERRAMENTAS.map(([k,t,d,ic])=>`<button class="tool-btn" data-act="ferramenta" data-f="${k}" aria-current="${ativo===k}"><span class="ic">${ICON[ic]}</span><span><b>${t}</b><span>${d}</span></span></button>`).join("")}
       <div class="land-note">As ferramentas livres não guardam nada. Processos, clientes e agenda ficam na área do escritório, depois de entrar.</div></aside>
-    <section class="land-center">${ativo ? vFerramenta() : cartaoLogin()}</section>
+    <section class="land-center">${L.atend ? formAtendimento() : ativo && !soLogin ? vFerramenta() : cartaoLogin()}</section>
     <aside class="land-daily">${listaDaily(true)}</aside>
     <nav class="land-tabs" aria-label="Navegação">${tabs.map(([k,l,ic])=>`<button data-act="pane" data-p="${k}" aria-current="${paneAtual===k}"><span class="pill">${ICON[ic]}</span>${l}</button>`).join("")}</nav>
   </div>`;
@@ -258,6 +272,7 @@ function vFerramenta(){
   const f = L.ferramenta, voltar = `<button class="btn ghost" data-act="ferramenta-fechar">${ICON.arrowL} Voltar ao login</button>`;
   if(f==="duvidas") return `<div class="tool-view">${chatHTML({msgs:L.chat, input:L.chatInput, idIn:"chat-in", bind:"L.chatInput", act:"chat", titulo:"Dúvidas jurídicas", sub:"Pergunte com suas palavras. A resposta traz a regra, o prazo e o fundamento legal.", voltar, sug:["Quais verbas são devidas na demissão sem justa causa?","Qual o prazo da apelação?","Como conto prazo publicado no DJEN?","Quando cabe ANPP?"]})}</div>`;
   if(f==="direito") return `<div class="tool-view">${vDireito(voltar)}</div>`;
+  if(f==="calculadoras") return `<div class="tool-view">${vCalculadoras(voltar)}</div>`;
   if(f==="assistente-ia"){
     const sug = ["Quais verbas são devidas na rescisão sem justa causa?","Como funciona a contagem de prazo em dias úteis no CPC?","Diferença entre apelação e agravo de instrumento","O que é prescrição intercorrente?"];
     return `<div class="tool-view"><div class="head"><div><span class="ia-tag">${ICON.ia} Inteligência artificial</span><h1>Assistente jurídico</h1><div class="sub">Dúvidas gerais de Direito. Não cole dados de clientes aqui.</div></div>${L.chat.length?`<button class="btn ghost" data-act="chat-limpar">Nova conversa</button>`:voltar}</div>
@@ -327,7 +342,11 @@ function itensNav(){
   const it = [["inicio","Início"],["agenda","Agenda"],["processos","Processos"]];
   if(pode("gerenciar_clientes")||pode("ver_todos_processos")) it.push(["clientes","Clientes"]);
   if(pode("revisar_minutas")) it.push(["minutas","Revisão de minuta"]);
+  if(pode("gerenciar_equipe")) it.splice(1, 0, ["painel","Painel"]);
   if(pode("editar_processos")||pode("revisar_minutas")||pode("gerenciar_clientes")) it.push(["pecas","Peças e documentos"]);
+  if(pode("atendimentos")||pode("gerenciar_clientes")) it.push(["atendimentos","Atendimentos"]);
+  if(pode("financeiro")) it.push(["financeiro","Financeiro"]);
+  it.push(["calculadoras","Calculadoras"]);
   it.push(["assistente","Assistente"]);
   it.push(["direito","Direito geral"]);
   it.push(["daily","Daily jurídico"]);
@@ -361,7 +380,7 @@ function render(dados){
   const ae = document.activeElement;
   const editando = dados && ae && $("#main").contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.id!=="busca";
   if((!dados || vivo) && !editando){
-    const fn = {inicio:vInicio, agenda:vAgenda, processos:vProcessos, clientes:vClientes, minutas:vMinutas, assistente:vAssistente, pecas:vPecas, direito:()=>vDireito(""), daily:vDaily, relatorios:vRelatorios, equipe:vEquipe, portal:vPortal}[view];
+    const fn = {inicio:vInicio, agenda:vAgenda, processos:vProcessos, clientes:vClientes, minutas:vMinutas, assistente:vAssistente, pecas:vPecas, financeiro:vFinanceiro, atendimentos:vAtendimentos, calculadoras:()=>vCalculadoras(""), painel:vPainel, direito:()=>vDireito(""), daily:vDaily, relatorios:vRelatorios, equipe:vEquipe, portal:vPortal}[view];
     const main = $("#main");
     const foco = ae && ae.id==="busca" ? ae.selectionStart : null;
     main.innerHTML = (api.modo==="demo"?`<div class="banner">Demonstração fora do Claude: dados de exemplo, nada é salvo.</div>`:"") + fn();
@@ -472,7 +491,7 @@ function vAgenda(){
   const feitas = ts.filter(t=>t.done).sort((a,b)=>(b.concluido_em||"").localeCompare(a.concluido_em||"")).slice(0,15);
   const grupo = (titulo, lista, cls, nota) => lista.length ? `<div class="group-t"><h3 class="${cls||""}">${titulo}</h3><span class="small muted">${lista.length}${nota?" · "+nota:""}</span></div>${lista.map(itemTarefa).join("")}` : "";
   return `<div class="head"><div><div class="eyebrow">${esc(new Date().toLocaleDateString("pt-BR",{weekday:"long", day:"numeric", month:"long"}))}</div><h1>Agenda</h1></div>
-    <div class="row">${pode("criar_tarefas")?`<button class="btn" data-act="nova-tarefa" data-tipo="Audiência">${ICON.plus}<span class="lbl">Audiência</span></button><button class="btn" data-act="nova-tarefa" data-tipo="Peça">${ICON.plus}<span class="lbl">Tarefa</span></button><button class="btn primary" data-act="nova-tarefa" data-tipo="Prazo">${ICON.plus}Prazo</button>`:`<button class="btn primary" data-act="nova-tarefa" data-tipo="Peça">${ICON.plus}Nova atividade</button>`}</div></div>
+    <div class="row"><button class="btn ghost" data-act="agenda-celular">${ICON.agenda}<span class="lbl">No celular</span></button>${pode("criar_tarefas")?`<button class="btn" data-act="nova-tarefa" data-tipo="Audiência">${ICON.plus}<span class="lbl">Audiência</span></button><button class="btn" data-act="nova-tarefa" data-tipo="Peça">${ICON.plus}<span class="lbl">Tarefa</span></button><button class="btn primary" data-act="nova-tarefa" data-tipo="Prazo">${ICON.plus}Prazo</button>`:`<button class="btn primary" data-act="nova-tarefa" data-tipo="Peça">${ICON.plus}Nova atividade</button>`}</div></div>
   <div class="stats">
     <button class="stat ${g.atr.length?"danger":""}" data-act="rolar"><b>${g.atr.length}</b><span>Prazos vencidos</span></button>
     <button class="stat ${g.hoje.length?"warn":""}" data-act="rolar"><b>${g.hoje.length}</b><span>Para fazer hoje</span></button>
@@ -513,7 +532,8 @@ function vProcessos(){
   if(q) ps = ps.filter(p=>[p.numero,nomeCliente(p),p.parte_contraria,p.vara,nomePerfil(p.responsavel_id),p.resumo].join(" ").toLowerCase().includes(q));
   ps.sort((a,b)=>(proximo(a.id)?.data||"9999").localeCompare(proximo(b.id)?.data||"9999"));
   return `<div class="head"><div><h1>Processos</h1><div class="sub">${pode("ver_todos_processos")?"Toda a carteira do escritório, separada por área.":"Processos em que você é responsável ou tem atividade atribuída."}</div></div>
-    ${pode("editar_processos")?`<div class="row"><button class="btn" data-act="ler-pdf">${ICON.scan}<span class="lbl">Ler intimação</span></button><button class="btn primary" data-act="novo-processo">${ICON.plus}Novo processo</button></div>`:""}</div>
+    ${pode("editar_processos")||pode("registrar_andamentos")?`<div class="row"><button class="btn" data-act="dj-todos" ${DJLOTE.rodando?"disabled":""}>${ICON.refresh}<span class="lbl">Andamentos DataJud</span></button>${pode("editar_processos")?`<button class="btn" data-act="ler-pdf">${ICON.scan}<span class="lbl">Ler intimação</span></button><button class="btn primary" data-act="novo-processo">${ICON.plus}Novo processo</button>`:""}</div>`:""}</div>
+  ${bannerDataJud()}
   ${tabsArea(cont)}
   <div class="search">${ICON.search}<input type="search" id="busca" placeholder="Buscar por número, cliente, parte contrária, vara…" value="${esc(busca)}" data-bind="busca"></div>
   <div class="panel">${!S.processos.length?`<div class="empty"><h2>Nenhum processo</h2><p>${pode("editar_processos")?"Cadastre o primeiro processo com o número no padrão CNJ. O app confere o dígito verificador e identifica o ramo da Justiça.":"Os processos aparecem aqui quando você for responsável ou receber uma atividade."}</p>${pode("editar_processos")?`<button class="btn primary" data-act="novo-processo">${ICON.plus}Cadastrar processo</button>`:""}</div>`:!ps.length?`<div class="empty"><p>Nenhum processo com esse filtro.</p></div>`:`
@@ -760,6 +780,8 @@ const AJUDA_ACOES = [
   ["Primeira versão da inicial","Monte a inicial do processo da Maria"],
   ["Contrato e procuração","Gere contrato e procuração do cliente José"],
   ["Checklist de documentos","Checklist de documentos do processo da Maria"],
+  ["Andamentos no DataJud","Verificar andamentos no DataJud"],
+  ["Financeiro","Quais parcelas estão vencidas?"],
   ["Consultas","Prazos desta semana · Próximas audiências · Documentos aguardando o cliente"]
 ];
 function ajudaHTML(intro){
@@ -784,6 +806,26 @@ function interpretarAcao(q){
   const verboCriar = /\b(cadastr|cri[ae]|criar|nov[oa]|inclu|adicion|registr|lanc|abr[ai]r? um|insir|insere|coloque|coloca)\w*/;
   // ajuda
   if(/^(ajuda|help|menu|oi|ola|e ai|bom dia|boa tarde|boa noite)\b|o que (voce|vc) (faz|sabe|pode)|como (funciona|te uso|usar)|nao entendi|^\?+$|comandos/.test(n)) return {html: ajudaHTML()};
+  // DataJud
+  if(/datajud|andamentos? (novo|oficia)|verific\w* (os )?andamentos|atualiz\w* (os )?andamentos|movimentac\w* (nova|do tribunal)/.test(n)){
+    const procs = encontrarProcessos(q);
+    if(procs.length===1){ abrirModal({kind:"detalhe", id:procs[0].id, vivo:true, aba:"andamentos"}); buscarDataJud(procs[0].id); return {html:`Consultando o DataJud para <b>${esc(rotProc(procs[0]))}</b>. As movimentações novas aparecem para você importar.`}; }
+    view = "processos"; verificarTodosDataJud(); return {html:"Estou verificando no DataJud todos os processos com número CNJ válido. O resultado aparece em Processos."};
+  }
+  // financeiro
+  if(/financeiro|cobranc|parcela|a receber|inadimpl|honorarios? .*(receber|vencid|aberto)/.test(n) && !/contrato|procuracao/.test(n)){
+    if(!pode("financeiro")) return {html: semPermissao("ver o financeiro")};
+    const h = hoje(), fs = S.financeiro||[], ab = fs.filter(f=>!f.pago_em), vz = ab.filter(f=>f.vencimento<h);
+    const lista = /vencid|inadimpl|atras/.test(n) ? vz : ab;
+    FIN.filtro = /vencid|inadimpl|atras/.test(n) ? "vencidas" : "abertas";
+    return {html:`<b>${lista.length} parcela(s) ${FIN.filtro==="vencidas"?"vencida(s)":"em aberto"}</b>, total ${moeda(lista.reduce((s,f)=>s+Number(f.valor),0))}.${lista.length?`<ul style="margin:6px 0 0;padding-left:18px">${lista.slice(0,10).map(f=>`<li>${fmt(f.vencimento)} · ${esc(cliById(f.cliente_id)?.nome||"—")} · ${esc(f.descricao)} · <b>${moeda(f.valor)}</b></li>`).join("")}</ul>`:""}<button class="linkbtn" data-act="nav" data-v="financeiro">Abrir o financeiro</button>`};
+  }
+  // atendimentos
+  if(/atendimento|novos? contatos?|leads?|primeira consulta/.test(n)){
+    if(!(pode("atendimentos")||pode("gerenciar_clientes"))) return {html: semPermissao("ver atendimentos")};
+    const as = (S.atendimentos||[]).filter(a=>a.status==="novo");
+    return {html:`<b>${as.length} atendimento(s) novo(s)</b>.${as.length?`<ul style="margin:6px 0 0;padding-left:18px">${as.slice(0,8).map(a=>`<li>${esc(a.nome)}${a.telefone?" · "+esc(a.telefone):""} · ${new Date(a.criado_em).toLocaleDateString("pt-BR")}</li>`).join("")}</ul>`:""}<button class="linkbtn" data-act="nav" data-v="atendimentos">Abrir atendimentos</button>`};
+  }
   // checklist de documentos e cobrança
   if(/checklist|documentos? (que )?(falta|pendente)|cobr\w* (os |de )?documentos|pedir (os )?documentos|lista de documentos/.test(n)){
     const procs = encontrarProcessos(q); const p = procs.length===1 ? procs[0] : null;
@@ -1027,7 +1069,7 @@ function pcInicial(){
     <label class="f">Linha do tempo (opcional, uma por linha: 10/03/2026 - fato)<textarea rows="3" data-bind="PC.cronologia" placeholder="05/02/2026 - Compra do ingresso&#10;14/03/2026 - Dia do evento, sem cobertura&#10;20/03/2026 - Reclamação sem resposta">${esc(PC.cronologia)}</textarea></label>
     <label class="f">Trecho em destaque (opcional: frase da publicidade, contrato ou documento)<input type="text" data-bind="PC.citacao" value="${esc(PC.citacao)}" placeholder='Ex.: "Teremos áreas cobertas em todos os setores"'></label>
     <label class="f">Pedidos adicionais (um por linha)<textarea rows="3" data-bind="PC.pedidos" placeholder="Ex.: a condenação ao pagamento de R$ 10.000,00 por danos morais">${esc(PC.pedidos)}</textarea></label>
-    ${M.defesa?`<label class="f">Rol de testemunhas (opcional)<textarea rows="2" data-bind="PC.testemunhas">${esc(PC.testemunhas)}</textarea></label>`:`<label class="f">Valor da causa<input type="text" data-bind="PC.valorCausa" value="${esc(PC.valorCausa)}" placeholder="R$"></label>`}
+    ${M.defesa?`<label class="f">Rol de testemunhas (opcional)<textarea rows="2" data-bind="PC.testemunhas">${esc(PC.testemunhas)}</textarea></label>`:M.intermediaria?"":`<label class="f">Valor da causa<input type="text" data-bind="PC.valorCausa" value="${esc(PC.valorCausa)}" placeholder="R$"></label>`}
     <label class="f">Assinatura<select data-bind="PC.advogado">${opts([["","Selecione o(a) advogado(a)"]].concat(advs.map(a=>[a,a.split(",")[0]])).concat(equipeAtiva().filter(u=>u.papel!=="estagiario").map(u=>[u.nome, u.nome])), PC.advogado)}</select></label>
   </div></div>
   <div class="panel pc-teses"><div class="panel-b" style="display:flex;flex-direction:column;gap:8px">
@@ -1043,7 +1085,7 @@ function gerarPeca(){
   const teses = PC.teses.map(id=>todas.find(t=>t.id===id)).filter(Boolean);
   const p = procById(PC.processo_id);
   const pedidos = String(PC.pedidos||"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
-  const html = P.montarPeca({modelo:PC.modelo, docs:docsCfg(), escritorio:S.escritorio?.nome, cliente:cliById(PC.cliente_id), cidade:PC.cidade || docsCfg().cidade, juizo:PC.juizo, contraria:PC.contraria, contrariaQuali:PC.contrariaQuali, resumo:PC.resumo, fatos:PC.fatos, cronologia:PC.cronologia, citacao:PC.citacao, teses, pedidos, valorCausa:PC.valorCausa, testemunhas:PC.testemunhas, advogado:PC.advogado, numero:M.defesa && p ? p.numero : "", valores: M.liquidos ? teses.map(t=>t.pedido).filter(Boolean).concat(pedidos).map(x=>[x.charAt(0).toUpperCase()+x.slice(1), ""]) : []});
+  const html = P.montarPeca({modelo:PC.modelo, docs:docsCfg(), escritorio:S.escritorio?.nome, cliente:cliById(PC.cliente_id), cidade:PC.cidade || docsCfg().cidade, juizo:PC.juizo, contraria:PC.contraria, contrariaQuali:PC.contrariaQuali, resumo:PC.resumo, fatos:PC.fatos, cronologia:PC.cronologia, citacao:PC.citacao, teses, pedidos, valorCausa:PC.valorCausa, testemunhas:PC.testemunhas, advogado:PC.advogado, numero:(M.defesa||M.intermediaria) && p ? p.numero : "", valores: M.liquidos ? teses.map(t=>t.pedido).filter(Boolean).concat(pedidos).map(x=>[x.charAt(0).toUpperCase()+x.slice(1), ""]) : []});
   abrirModal({kind:"docgerado", html, nome:`${M.nome} - ${cliById(PC.cliente_id)?.nome||"cliente"}`, processo_id:PC.processo_id});
 }
 function pcContrato(){
@@ -1083,7 +1125,7 @@ function pcContrato(){
 function gerarContrato(qual){
   const c = cliById(PC.ccli); if(!c){ toast("Escolha o cliente."); return; }
   const base = {docs:docsCfg(), escritorio:S.escritorio?.nome, cliente:c, cidade:PC.cidade || docsCfg().cidade, advogados:PC.advs||[]};
-  if(qual!=="procuracao") abrirModal({kind:"docgerado", html:P.montarContrato(Object.assign({}, base, {objeto:PC.objeto, honorarios:{fixo:PC.fixo, entrada:PC.entrada, parcelas:PC.parcelas, exito:PC.exito, forma:PC.forma}})), nome:`Contrato de honorários - ${c.nome}`, processo_id:PC.cproc, proximo: qual==="ambos" ? "procuracao" : ""});
+  if(qual!=="procuracao") abrirModal({kind:"docgerado", html:P.montarContrato(Object.assign({}, base, {objeto:PC.objeto, honorarios:{fixo:PC.fixo, entrada:PC.entrada, parcelas:PC.parcelas, exito:PC.exito, forma:PC.forma}})), nome:`Contrato de honorários - ${c.nome}`, processo_id:PC.cproc, proximo: qual==="ambos" ? "procuracao" : "", financeiro:true});
   else abrirModal({kind:"docgerado", html:P.montarProcuracao(Object.assign({}, base, {especiais:PC.especiais, finalidade:PC.objeto})), nome:`Procuração - ${c.nome}`, processo_id:PC.cproc});
 }
 function pcChecklist(){
@@ -1093,7 +1135,7 @@ function pcChecklist(){
   const ck = lista.find(x=>x[0]===PC.ktipo);
   const docs = p ? docsDe(p.id) : [];
   const achar = nome => docs.find(d=>nrm(d.nome)===nrm(nome));
-  const ok = d => d && ["Recebido","Assinado","Protocolado"].includes(d.status);
+  const ok = d => d && ["Recebido","Assinado","Protocolado","Enviado pelo cliente"].includes(d.status);
   const itens = ck ? ck[2] : [];
   const faltam = itens.filter(i=>!ok(achar(i)));
   const cli = p ? cliById(p.cliente_id) : null;
@@ -1146,7 +1188,7 @@ function mModelo(m){
 }
 function mDocGerado(m){
   return cab(esc(m.nome), "Primeira versão · campos em amarelo para completar") + `<div class="sheet-b" style="padding:0"><iframe id="doc-frame" class="doc-frame" title="Documento"></iframe></div>
-  <div class="sheet-f">${m.processo_id && (pode("editar_processos")||pode("registrar_andamentos"))?`<button class="btn ghost" data-act="doc-registrar" style="margin-right:auto">Registrar no processo</button>`:""}<button class="btn" data-act="doc-word">${ICON.pdf}Baixar Word</button><button class="btn" data-act="doc-imprimir">Imprimir / PDF</button>${m.proximo?`<button class="btn primary" data-act="doc-proximo">Próximo: procuração ${ICON.arrow}</button>`:`<button class="btn primary" data-act="fechar">Concluir</button>`}</div>`;
+  <div class="sheet-f">${m.financeiro && pode("financeiro")?`<button class="btn ghost" data-act="doc-financeiro" style="margin-right:auto">Lançar parcelas no financeiro</button>`:""}${m.processo_id && (pode("editar_processos")||pode("registrar_andamentos"))?`<button class="btn ghost" data-act="doc-registrar" ${m.financeiro&&pode("financeiro")?"":`style="margin-right:auto"`}>Registrar no processo</button>`:""}<button class="btn" data-act="doc-word">${ICON.pdf}Baixar Word</button><button class="btn" data-act="doc-imprimir">Imprimir / PDF</button>${m.proximo?`<button class="btn primary" data-act="doc-proximo">Próximo: procuração ${ICON.arrow}</button>`:`<button class="btn primary" data-act="fechar">Concluir</button>`}</div>`;
 }
 async function acaoPecas(a, el){
   switch(a){
@@ -1222,6 +1264,404 @@ function blocoRadar(){
     </div></div>`;
 }
 
+/* =====================================================================
+   VERSÃO 3: portal resumido, envio de arquivos, financeiro, atendimentos,
+   calculadoras, painel do gestor, DataJud e agenda no celular
+   ===================================================================== */
+const moeda = v => (Number(v)||0).toLocaleString("pt-BR",{style:"currency", currency:"BRL"});
+const numBR = s => { const t = String(s||"").replace(/[^\d,.-]/g,""); if(!t) return 0; const n = t.includes(",") ? t.replace(/\./g,"").replace(",",".") : t; return Number(n)||0; };
+const waLink = (tel, txt) => { const d = String(tel||"").replace(/\D/g,""); if(d.length<10) return ""; return `https://wa.me/${d.length<=11?"55"+d:d}?text=${encodeURIComponent(txt||"")}`; };
+const nomeArquivo = n => String(n||"arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w.\-]+/g,"_").slice(-80);
+
+/* ---------- PORTAL DO CLIENTE (resumido) ---------- */
+function vPortal(){
+  const pt = S.portal;
+  if(!pt) return `<div class="panel"><div class="empty"><span class="spinner"></span><p>Carregando seus processos…</p></div></div>`;
+  if(!pt.vinculado) return `<div class="portal-hero"><h1>Olá, ${esc(P.primeiroNome(S.perfil.nome))}</h1><p class="muted" style="margin:0">Seu acesso está ativo. O escritório <b class="gold">${esc(pt.escritorio)}</b> ainda vai vincular seus processos ao seu cadastro.</p></div>`;
+  const ps = pt.processos || [];
+  const auds = ps.flatMap(p=>(p.audiencias||[]).map(a=>Object.assign({proc:p}, a))).sort((a,b)=>(a.data+(a.hora||"")).localeCompare(b.data+(b.hora||"")));
+  const pend = ps.flatMap(p=>(p.documentos||[]).filter(d=>d.status==="Aguardando cliente").map(d=>Object.assign({proc:p}, d)));
+  const advs = []; ps.forEach(p=>{ if(p.advogado && !advs.some(a=>a.nome===p.advogado.nome)) advs.push(Object.assign({proc:p}, p.advogado)); });
+  const ct = pt.contato || {};
+  const msgWa = p => `Olá! Sou ${pt.cliente||S.perfil.nome}, cliente do escritório. Tenho uma dúvida sobre o processo ${p?.numero||""}.`;
+  const contatos = `<div class="panel contato-card"><div class="panel-b" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="font-size:1.05rem;margin:0">Fale com seu advogado</h2>
+      ${advs.length?advs.map(a=>`<div class="adv"><span class="avatar">${esc(P.iniciais(a.nome))}</span><div style="min-width:0;flex:1"><b>${esc(a.nome)}</b><div class="small muted">Responsável pelo seu processo</div></div>
+        <div class="row" style="gap:6px">${waLink(a.telefone, msgWa(a.proc))?`<a class="btn primary" href="${waLink(a.telefone, msgWa(a.proc))}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>`:""}${a.email?`<a class="btn" href="mailto:${esc(a.email)}?subject=${encodeURIComponent("Processo "+(a.proc.numero||""))}">${ICON.mail}E-mail</a>`:""}</div></div>`).join(""):""}
+      ${ct.telefone||ct.email?`<div class="adv"><span class="avatar">§</span><div style="min-width:0;flex:1"><b>${esc(pt.escritorio)}</b><div class="small muted">${esc([ct.telefone, ct.email].filter(Boolean).join(" · "))}</div></div>
+        <div class="row" style="gap:6px">${waLink(ct.telefone, msgWa(ps[0]))?`<a class="btn" href="${waLink(ct.telefone, msgWa(ps[0]))}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>`:""}${ct.telefone?`<a class="btn" href="tel:${esc(ct.telefone.replace(/[^\d+]/g,""))}">Ligar</a>`:""}${ct.email?`<a class="btn" href="mailto:${esc(ct.email)}">${ICON.mail}E-mail</a>`:""}</div></div>`:""}
+      ${!advs.length && !ct.telefone && !ct.email?`<span class="small muted">O escritório ainda não cadastrou o contato. Responda à mensagem em que recebeu o link de acesso.</span>`:""}
+    </div></div>`;
+  const etapa = f => Math.max(0, ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento"].indexOf(f));
+  const card = p => { const pd = (p.documentos||[]).filter(d=>d.status==="Aguardando cliente"); const and = p.andamentos||[];
+    return `<div class="panel portal-proc"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
+      <div class="row" style="justify-content:space-between"><div style="min-width:0"><div class="mono small muted">${esc(p.numero||"")}</div><b style="font-size:1.05rem">${p.parte_contraria?"× "+esc(p.parte_contraria):esc(AREAS[p.area]?.nome||"Processo")}</b></div>${chipArea(p.area)}</div>
+      <div><div class="small muted">Fase atual</div><b class="gold">${esc(p.fase||"—")}</b>${["Acordo","Suspenso","Arquivado"].includes(p.fase)?"":`<div class="steps" style="margin-top:8px">${[0,1,2,3,4].map(i=>`<i class="${i<=etapa(p.fase)?"on":""}"></i>`).join("")}</div>`}</div>
+      ${p.resumo?`<div class="notice" style="font-size:.95rem;color:var(--ink)">${esc(p.resumo)}</div>`:""}
+      ${(p.audiencias||[]).length?`<div class="small"><b>Próxima audiência:</b> ${fmt(p.audiencias[0].data)}${p.audiencias[0].hora?" às "+esc(p.audiencias[0].hora):""} · ${esc(p.audiencias[0].modalidade||"")} ${p.audiencias[0].local?"· "+esc(p.audiencias[0].local):""}</div>`:""}
+      ${pd.length?`<div class="pend"><b>O escritório precisa destes documentos:</b>${pd.map(d=>`<div class="pend-i"><span>${esc(d.nome)}</span><label class="btn primary">${ICON.plus}Enviar<input type="file" hidden data-file="portal-doc" data-doc="${d.id}" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>`).join("")}</div>`:""}
+      <div><b class="small">Últimas movimentações</b>${and.length?`<div class="timeline" style="margin-top:8px">${and.slice(0,3).map(a=>`<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div></div>`).join("")}</div>${and.length>3?`<details><summary class="small gold" style="cursor:pointer;margin-top:6px">Ver todas (${and.length})</summary><div class="timeline" style="margin-top:8px">${and.slice(3).map(a=>`<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div></div>`).join("")}</div></details>`:""}`:`<div class="small muted" style="margin-top:6px">Ainda não há movimentações para mostrar.</div>`}</div>
+      ${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length?`<details><summary class="small muted" style="cursor:pointer">Documentos já entregues (${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length})</summary>${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").map(d=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>${esc(d.nome)}</span><span class="chip ok">${esc(d.status)}</span></div>`).join("")}</details>`:""}
+      <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="pn-${p.id}" placeholder="Enviar outro documento: escreva o nome" style="flex:1"><label class="btn">${ICON.plus}Arquivo<input type="file" hidden data-file="portal-novo" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>
+      <button class="linkbtn small" data-act="pdf-portal" data-id="${p.id}" style="align-self:flex-start">Baixar resumo em PDF</button>
+    </div></div>`; };
+  return `<div class="portal-hero">${pt.logo?`<img src="${pt.logo}" alt="" style="max-height:44px;max-width:200px;background:#fff;border-radius:8px;padding:4px;margin-bottom:6px">`:`<span class="small gold" style="text-transform:uppercase;letter-spacing:.12em;font-weight:600">${esc(pt.escritorio)}</span>`}
+    <h1>Olá, ${esc(P.primeiroNome(pt.cliente||S.perfil.nome))}</h1>
+    <div class="portal-kpis"><div><b>${ps.length}</b><span>processo(s)</span></div><div><b>${auds[0]?fmtCurto(auds[0].data):"—"}</b><span>próxima audiência</span></div><div class="${pend.length?"alerta":""}"><b>${pend.length}</b><span>documento(s) para enviar</span></div></div></div>
+    <div class="portal-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">${ps.length?ps.map(card).join(""):`<div class="panel"><div class="empty"><p>Nenhum processo vinculado ao seu cadastro.</p></div></div>`}</div>${contatos}</div>`;
+}
+async function enviarPortal(tipo, file, el){
+  if(!file) return;
+  if(file.size > 10*1024*1024){ toast("Arquivo maior que 10 MB. Envie uma versão menor."); return; }
+  const pid = el.dataset.proc, pt = S.portal || {};
+  const nome = tipo==="portal-novo" ? ($("#pn-"+pid)?.value||"").trim() : "";
+  if(tipo==="portal-novo" && !nome){ toast("Escreva o nome do documento antes de escolher o arquivo."); $("#pn-"+pid)?.focus(); return; }
+  const caminho = `${pt.escritorio_id||S.perfil.escritorio_id}/${pid}/${Date.now()}-${nomeArquivo(file.name)}`;
+  toast("Enviando…");
+  try{
+    await api.enviarArquivo(caminho, file);
+    if(tipo==="portal-doc") await api.rpc("cliente_enviar_documento", {doc:el.dataset.doc, caminho});
+    else await api.rpc("cliente_novo_documento", {pid, p_nome:nome, caminho});
+    S.portal = await api.portal(); render(); toast("Documento enviado. O escritório foi avisado.");
+  }catch(e){ toast(P.erroAmigavel(e)); }
+}
+async function verArquivo(caminho){ try{ const u = await api.urlArquivo(caminho); window.open(u, "_blank", "noopener"); }catch(e){ toast(P.erroAmigavel(e)); } }
+
+/* ---------- FINANCEIRO ---------- */
+const FIN = {filtro:"abertas", mes:""};
+function vFinanceiro(){
+  const h = hoje(), ini = h.slice(0,8)+"01", fimMes = iso(addDays(new Date(new Date().getFullYear(), new Date().getMonth()+1, 1), -1));
+  const fs = (S.financeiro||[]).slice();
+  const abertas = fs.filter(f=>!f.pago_em), venc = abertas.filter(f=>f.vencimento<h), mes = abertas.filter(f=>f.vencimento>=ini && f.vencimento<=fimMes);
+  const pagosMes = fs.filter(f=>f.pago_em && f.pago_em>=ini && f.pago_em<=fimMes);
+  const soma = a => a.reduce((s,f)=>s+Number(f.valor||0),0);
+  let lista = FIN.filtro==="vencidas" ? venc : FIN.filtro==="pagas" ? fs.filter(f=>f.pago_em) : FIN.filtro==="todas" ? fs : abertas;
+  if(FIN.mes) lista = lista.filter(f=>(f.vencimento||"").slice(0,7)===FIN.mes);
+  lista.sort((a,b)=>(a.vencimento||"").localeCompare(b.vencimento||""));
+  const st = f => f.pago_em ? ["Pago em "+fmt(f.pago_em),"ok"] : f.vencimento<h ? ["Vencida","danger"] : f.vencimento===h ? ["Vence hoje","warn"] : ["A vencer","neutral"];
+  return `<div class="head"><div><h1>Financeiro</h1><div class="sub">Honorários a receber, parcelas dos contratos, recibos e mensagens de cobrança.</div></div><button class="btn primary" data-act="fin-novo">${ICON.plus}Nova cobrança</button></div>
+  <div class="stats fin-stats"><div class="stat"><span>A receber no mês</span><b>${moeda(soma(mes))}</b><small>${mes.length} parcela(s)</small></div><div class="stat ${venc.length?"alerta":""}"><span>Vencidas</span><b>${moeda(soma(venc))}</b><small>${venc.length} parcela(s)</small></div><div class="stat"><span>Recebido no mês</span><b>${moeda(soma(pagosMes))}</b><small>${pagosMes.length} pagamento(s)</small></div><div class="stat"><span>Total em aberto</span><b>${moeda(soma(abertas))}</b><small>${abertas.length} parcela(s)</small></div></div>
+  <div class="row" style="justify-content:space-between;margin:6px 0 12px"><div class="seg">${[["abertas","Em aberto"],["vencidas","Vencidas"],["pagas","Pagas"],["todas","Todas"]].map(([k,l])=>`<button data-act="fin-filtro" data-f="${k}" aria-pressed="${FIN.filtro===k}">${l}</button>`).join("")}</div><input type="month" data-bind="FIN.mes" data-re="fin" value="${esc(FIN.mes)}" style="width:auto"></div>
+  <div class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Vencimento</th><th>Cliente</th><th>Descrição</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
+  ${lista.length?lista.map(f=>{ const [t,c] = st(f), cli = cliById(f.cliente_id); return `<tr style="cursor:default"><td class="mono">${fmt(f.vencimento)}</td><td>${esc(cli?.nome||"—")}</td><td>${esc(f.descricao)}${f.processo_id&&procById(f.processo_id)?`<div class="small muted mono">${esc(procById(f.processo_id).numero||"")}</div>`:""}</td><td><b>${moeda(f.valor)}</b></td><td><span class="chip ${c}">${t}</span></td>
+    <td><div class="row" style="gap:4px;flex-wrap:nowrap;justify-content:flex-end">${f.pago_em?`<button class="btn ghost" data-act="fin-recibo" data-id="${f.id}">Recibo</button><button class="linkbtn small" data-act="fin-desfazer" data-id="${f.id}">Desfazer</button>`:`<button class="btn" data-act="fin-pagar" data-id="${f.id}">Recebido</button>${cli?.telefone?`<a class="icon-btn" title="Cobrar no WhatsApp" href="${waLink(cli.telefone, `Olá, ${P.primeiroNome(cli.nome)}! Lembrete: a parcela "${f.descricao}" de ${moeda(f.valor)} ${f.vencimento<h?"venceu em":"vence em"} ${fmt(f.vencimento)}. Qualquer dúvida, estamos à disposição. ${S.escritorio?.nome||""}`)}" target="_blank" rel="noopener">${ICON.wa}</a>`:""}`}<button class="icon-btn" data-act="fin-editar" data-id="${f.id}" aria-label="Editar">${ICON.ajustes}</button></div></td></tr>`; }).join(""):`<tr><td colspan="6"><div class="empty small"><p>Nenhuma cobrança neste filtro.</p></div></td></tr>`}
+  </tbody></table></div></div>`;
+}
+function mFinanceiro(m){
+  const f = m.f || (m.f = m.id ? Object.assign({}, (S.financeiro||[]).find(x=>x.id===m.id)) : Object.assign({descricao:"Honorários", valor:"", vencimento:hoje(), parcelas:1, forma:"PIX"}, m.pre||{}));
+  return cab(m.id?"Editar cobrança":"Nova cobrança") + `<form class="sheet-b" autocomplete="off"><div class="grid2">
+    <label class="f">Cliente<select id="fn-cli">${optsCli(f.cliente_id)}</select></label>
+    <label class="f">Processo (opcional)<select id="fn-proc">${optsProc(f.processo_id)}</select></label>
+    <label class="f span2">Descrição<input type="text" id="fn-desc" value="${esc(f.descricao||"")}" placeholder="Ex.: Honorários contratuais"></label>
+    <label class="f">Valor ${m.id?"":"de cada parcela"}<input type="text" id="fn-valor" inputmode="decimal" value="${esc(f.valor===""?"":String(f.valor).replace(".",","))}" placeholder="500,00"></label>
+    <label class="f">${m.id?"Vencimento":"1º vencimento"}<input type="date" id="fn-venc" value="${esc(f.vencimento||hoje())}"></label>
+    ${m.id?"":`<label class="f">Número de parcelas (mensais)<input type="number" id="fn-parc" min="1" max="60" value="${esc(f.parcelas||1)}"></label>`}
+    <label class="f">Forma de pagamento<input type="text" id="fn-forma" value="${esc(f.forma||"")}" placeholder="PIX, boleto, cartão"></label>
+    <label class="f span2">Observações<input type="text" id="fn-obs" value="${esc(f.obs||"")}"></label>
+  </div></form><div class="sheet-f">${m.id?`<button class="btn danger" data-act="excluir" data-col="financeiro" data-id="${m.id}" style="margin-right:auto">Excluir</button>`:""}<button class="btn" data-act="fechar">Cancelar</button><button class="btn primary" data-act="fin-salvar">Salvar</button></div>`;
+}
+function reciboPdf(f){
+  if(!exigePdf()) return; const cli = cliById(f.cliente_id), dc = docsCfg();
+  const ctx = P.pdfNovo("Recibo", `${moeda(f.valor)} · ${fmt(f.pago_em)}`);
+  P.pdfTexto(ctx, `Recebemos de ${cli?.nome||"________"}${cli?.doc?", CPF/CNPJ "+cli.doc:""}, a importância de ${moeda(f.valor)}, referente a ${f.descricao}${f.processo_id&&procById(f.processo_id)?.numero?" (processo "+procById(f.processo_id).numero+")":""}, paga em ${fmt(f.pago_em)}${f.forma?" via "+f.forma:""}.`);
+  P.pdfTexto(ctx, "Para clareza, firmamos o presente recibo.");
+  P.pdfCampos(ctx, [["Emitente", dc.nome||S.escritorio?.nome||""],["CNPJ", dc.cnpj||""],["Endereço", dc.endereco||""],["Data", fmt(hoje())]]);
+  P.pdfTexto(ctx, "\n\n______________________________________\n"+(dc.nome||S.escritorio?.nome||""));
+  P.pdfSalvar(ctx, `Recibo ${nomeArquivo(cli?.nome||"")} ${f.pago_em}.pdf`);
+}
+function parcelasDoContrato(){
+  const cli = PC.ccli, base = hoje(), linhas = [];
+  const ent = numBR(PC.entrada); if(ent) linhas.push({descricao:"Honorários · entrada", valor:ent, vencimento:base});
+  const m = String(PC.parcelas||"").match(/(\d+)\s*x\s*(?:de\s*)?(?:r\$\s*)?([\d.,]+)/i);
+  if(m){ for(let i=1;i<=Number(m[1]);i++){ const d = new Date(); d.setMonth(d.getMonth()+i); linhas.push({descricao:`Honorários · parcela ${i}/${m[1]}`, valor:numBR(m[2]), vencimento:iso(d)}); } }
+  if(!linhas.length && numBR(PC.fixo)) linhas.push({descricao:"Honorários contratuais", valor:numBR(PC.fixo), vencimento:base});
+  return {cliente_id:cli, processo_id:PC.cproc||null, linhas};
+}
+
+/* ---------- ATENDIMENTOS (captação) ---------- */
+const ATS = [["novo","Novos"],["em contato","Em contato"],["proposta","Proposta enviada"],["fechado","Fechados"],["perdido","Perdidos"]];
+const linkAtendimento = () => location.origin + location.pathname + "?atendimento=" + (S.escritorio?.codigo||"");
+function vAtendimentos(){
+  const as = (S.atendimentos||[]).slice().sort((a,b)=>(b.criado_em||"").localeCompare(a.criado_em||""));
+  return `<div class="head"><div><h1>Atendimentos</h1><div class="sub">Pedidos de primeira consulta que chegam pelo formulário "conte seu caso", do contato até o contrato fechado.</div></div><button class="btn primary" data-act="at-novo">${ICON.plus}Registrar atendimento</button></div>
+  <div class="notice row" style="justify-content:space-between;gap:10px"><span><b>Link do formulário para divulgar</b> (site, Instagram, WhatsApp): <span class="mono small">${esc(linkAtendimento())}</span></span><button class="btn" data-act="copiar-txt" data-t="${esc(linkAtendimento())}">${ICON.copy}Copiar link</button></div>
+  <div class="kanban">${ATS.map(([k,l])=>{ const col = as.filter(a=>a.status===k); return `<div class="kb-col"><div class="kb-h"><b>${l}</b><span class="chip neutral">${col.length}</span></div>${col.map(a=>`<div class="kb-card"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><b>${esc(a.nome)}</b>${a.area&&AREAS[a.area]?chipArea(a.area):""}</div>
+      <div class="small muted">${new Date(a.criado_em).toLocaleDateString("pt-BR")}${a.telefone?" · "+esc(a.telefone):""}${a.email?" · "+esc(a.email):""}</div>
+      ${a.relato?`<div class="small kb-rel">${esc(a.relato)}</div>`:""}
+      <div class="row" style="gap:4px"><select data-act="at-status" data-id="${a.id}" aria-label="Situação">${opts(ATS.map(([v,t])=>[v,t]), a.status)}</select>${waLink(a.telefone,"")?`<a class="icon-btn" href="${waLink(a.telefone, `Olá, ${P.primeiroNome(a.nome)}! Aqui é do ${S.escritorio?.nome||"escritório"}. Recebemos seu contato e gostaríamos de entender melhor o seu caso.`)}" target="_blank" rel="noopener" title="WhatsApp">${ICON.wa}</a>`:""}
+      ${a.cliente_id?`<button class="linkbtn small" data-act="editar-cliente" data-id="${a.cliente_id}">Ver cliente</button>`:`<button class="linkbtn small" data-act="at-cliente" data-id="${a.id}">Virar cliente</button>`}<button class="icon-btn" data-act="excluir" data-col="atendimentos" data-id="${a.id}" aria-label="Excluir">${ICON.x}</button></div></div>`).join("")||`<div class="small muted" style="padding:6px">—</div>`}</div>`; }).join("")}</div>`;
+}
+function formAtendimento(){
+  const a = L.atend || {}, e = a.esc || {};
+  if(a.enviado) return `<div class="login-card" style="max-width:520px"><h1>Recebemos seu contato</h1><p class="muted" style="margin:0">Obrigado, ${esc(P.primeiroNome(a.nome||""))}. A equipe do ${esc(e.nome||"escritório")} vai retornar em breve pelo telefone ou e-mail informado.</p></div>`;
+  if(!e.nome) return `<div class="login-card" style="max-width:520px"><h1>Formulário indisponível</h1><p class="muted" style="margin:0">Este link não corresponde a nenhum escritório. Confira o endereço recebido.</p></div>`;
+  return `<div class="login-card" style="max-width:560px">${e.logo?`<img src="${e.logo}" alt="" style="max-height:48px;max-width:220px;background:#fff;border-radius:8px;padding:4px">`:""}<span class="ia-tag">${esc(e.nome)}</span><h1>Conte seu caso</h1><p class="muted" style="margin:0">Descreva o que aconteceu. A equipe analisa e entra em contato. As informações são confidenciais.</p>
+    <form id="f-atendimento" class="auth-card" style="gap:12px">
+      <label class="f">Seu nome<input type="text" id="at-nome" required autocomplete="name"></label>
+      <div class="grid2"><label class="f">Celular / WhatsApp<input type="tel" id="at-tel" autocomplete="tel" placeholder="(11) 90000-0000"></label><label class="f">E-mail<input type="email" id="at-email" autocomplete="email"></label></div>
+      <label class="f">Assunto<select id="at-area"><option value="">Não sei dizer</option><option value="trabalhista">Trabalho (emprego, rescisão, verbas)</option><option value="civel">Consumidor, contratos, família, cobranças</option><option value="criminal">Criminal</option></select></label>
+      <label class="f">O que aconteceu?<textarea id="at-relato" rows="6" required placeholder="Conte com suas palavras, com datas se lembrar."></textarea></label>
+      <label class="check"><input type="checkbox" id="at-ok" required> Autorizo o escritório a usar estes dados para entrar em contato comigo sobre o meu caso.</label>
+      ${L.erroForm?`<div class="err">${esc(L.erroForm)}</div>`:""}
+      <button class="btn primary block" type="submit" ${L.enviando?"disabled":""}>${L.enviando?`<span class="spinner"></span>`:"Enviar"}</button></form></div>`;
+}
+
+/* ---------- CALCULADORAS ---------- */
+const CALC = {aba:"atualizacao", valor:"", de:"", ate:"", indice:"ipca", juros:"nenhum", jurosDe:"", res:null, carregando:false, erro:"",
+  salario:"", admissao:"", demissao:"", motivo:"sem_justa", aviso:"indenizado", feriasVencidas:"nao", fgts:"", rres:null};
+const mesAtual = () => hoje().slice(0,7);
+async function calcularAtualizacao(){
+  CALC.erro = ""; const v = numBR(CALC.valor), de = CALC.de, ate = CALC.ate || mesAtual();
+  if(!v || !de){ CALC.erro = "Informe o valor e o mês de início."; refazer(); return; }
+  if(de > ate){ CALC.erro = "O mês de início deve ser anterior ao final."; refazer(); return; }
+  CALC.carregando = true; refazer();
+  const fmtM = m => `01/${m.slice(5,7)}/${m.slice(0,4)}`;
+  const meses = []; { let [y,mm] = de.split("-").map(Number); const [yf,mf] = ate.split("-").map(Number); while(y<yf || (y===yf && mm<mf)){ meses.push(`${y}-${String(mm).padStart(2,"0")}`); mm++; if(mm>12){ mm=1; y++; } } }
+  try{
+    const serieDe = fmtM(de), serieAte = fmtM(ate);
+    const pegar = async s => { const r = await api.servico("indices", {serie:s, de:serieDe, ate:serieAte}); if(r && r.erro) throw new Error(r.erro); const mp = {}; (r.valores||[]).forEach(x=>{ const [d,m,y] = x.data.split("/"); mp[`${y}-${m}`] = x.valor; }); return mp; };
+    const precisaIpca = CALC.indice!=="nenhum" || CALC.juros==="legal";
+    const idx = CALC.indice!=="nenhum" ? await pegar(CALC.indice) : {};
+    const ipca = CALC.juros==="legal" ? (CALC.indice==="ipca" ? idx : await pegar("ipca")) : {};
+    const selic = ["selic","legal"].includes(CALC.juros) ? await pegar("selic") : {};
+    let fator = 1, jurosPct = 0; const jDe = CALC.jurosDe || de; const memoria = [];
+    for(const m of meses){
+      const i = CALC.indice!=="nenhum" ? (idx[m] ?? null) : null;
+      if(i!==null) fator *= 1 + i/100;
+      let j = 0;
+      if(m >= jDe){ if(CALC.juros==="1am") j = 1; else if(CALC.juros==="selic") j = selic[m] ?? 0; else if(CALC.juros==="legal") j = Math.max(0, (selic[m] ?? 0) - (ipca[m] ?? 0)); }
+      jurosPct += j;
+      memoria.push([m, i, j, fator]);
+    }
+    const corrigido = v * fator, juros = corrigido * jurosPct/100;
+    const faltando = memoria.filter(x=>CALC.indice!=="nenhum" && x[1]===null).length;
+    CALC.res = {v, corrigido, juros, total:corrigido+juros, fator, jurosPct, memoria, faltando, precisaIpca};
+  }catch(e){ CALC.erro = String(e.message||e); CALC.res = null; }
+  CALC.carregando = false; refazer();
+}
+function calcularRescisao(){
+  const sal = numBR(CALC.salario), ad = CALC.admissao, dm = CALC.demissao;
+  if(!sal || !ad || !dm || dm < ad){ CALC.rres = {erro:"Informe salário, admissão e demissão (demissão depois da admissão)."}; refazer(); return; }
+  const dA = parse(ad), dD = parse(dm), mot = CALC.motivo;
+  const anos = Math.floor((dD - dA) / (365.25*864e5));
+  const diasAviso = Math.min(90, 30 + 3*anos);
+  const temAviso = mot==="sem_justa" || mot==="acordo";
+  const avisoInd = temAviso && CALC.aviso==="indenizado";
+  const projDias = avisoInd ? (mot==="acordo" ? Math.floor(diasAviso/2) : diasAviso) : 0;
+  const fimProj = addDays(dD, projDias);
+  const saldo = sal/30 * dD.getDate();
+  const valAviso = avisoInd ? sal/30 * diasAviso * (mot==="acordo" ? 0.5 : 1) : 0;
+  const mesesNoAno = (ini, fim) => { let n = 0; for(let m = 0; m < 12; m++){ const a = new Date(fim.getFullYear(), m, 1), b = new Date(fim.getFullYear(), m+1, 0); const s = ini > a ? ini : a, e = fim < b ? fim : b; if(e >= s && (e - s)/864e5 + 1 >= 15) n++; } return n; };
+  const dec = mot==="justa" ? 0 : sal/12 * mesesNoAno(dA > new Date(fimProj.getFullYear(),0,1) ? dA : new Date(fimProj.getFullYear(),0,1), fimProj);
+  let anivers = new Date(dA); while(addDays(new Date(anivers.getFullYear()+1, anivers.getMonth(), anivers.getDate()), 0) <= fimProj) anivers = new Date(anivers.getFullYear()+1, anivers.getMonth(), anivers.getDate());
+  let mesesFer = 0; { let c = new Date(anivers); while(true){ const prox = new Date(c.getFullYear(), c.getMonth()+1, c.getDate()); if(prox <= addDays(fimProj,1)){ mesesFer++; c = prox; } else { if((fimProj - c)/864e5 + 1 >= 15) mesesFer++; break; } } mesesFer = Math.min(12, mesesFer); }
+  const ferProp = mot==="justa" ? 0 : sal/12 * mesesFer * 4/3;
+  const ferVenc = CALC.feriasVencidas==="sim" ? sal * 4/3 : 0;
+  const fgtsSaldo = numBR(CALC.fgts);
+  const fgtsRes = 0.08 * (saldo + valAviso + dec);
+  const multa = mot==="sem_justa" ? 0.4*(fgtsSaldo+fgtsRes) : mot==="acordo" ? 0.2*(fgtsSaldo+fgtsRes) : 0;
+  const linhas = [["Saldo de salário ("+dD.getDate()+" dias)", saldo], avisoInd?["Aviso prévio indenizado ("+diasAviso+" dias"+(mot==="acordo"?", metade":"")+")", valAviso]:null, dec?["13º salário proporcional", dec]:null, ferProp?[`Férias proporcionais + 1/3 (${mesesFer}/12)`, ferProp]:null, ferVenc?["Férias vencidas + 1/3", ferVenc]:null, multa?[`Multa do FGTS (${mot==="acordo"?"20":"40"}%)`, multa]:null].filter(Boolean);
+  CALC.rres = {linhas, total:linhas.reduce((s,l)=>s+l[1],0), fgtsRes, saque: mot==="sem_justa" ? "Saque de 100% do FGTS e direito ao seguro-desemprego (se cumprir os requisitos)." : mot==="acordo" ? "Saque de até 80% do FGTS; sem seguro-desemprego." : "Sem saque do FGTS e sem seguro-desemprego.", diasAviso, anos};
+  refazer();
+}
+function calcAtualizacaoHTML(){
+  const r = CALC.res;
+  return `<div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
+    <div class="grid3"><label class="f">Valor original (R$)<input type="text" inputmode="decimal" data-bind="CALC.valor" value="${esc(CALC.valor)}" placeholder="10.000,00"></label>
+      <label class="f">Mês de início<input type="month" data-bind="CALC.de" value="${esc(CALC.de)}"></label><label class="f">Mês final<input type="month" data-bind="CALC.ate" value="${esc(CALC.ate||mesAtual())}"></label></div>
+    <div class="grid3"><label class="f">Correção monetária<select data-bind="CALC.indice">${opts([["ipca","IPCA (IBGE)"],["inpc","INPC (IBGE)"],["igpm","IGP-M (FGV)"],["nenhum","Sem correção"]], CALC.indice)}</select></label>
+      <label class="f">Juros de mora<select data-bind="CALC.juros">${opts([["nenhum","Sem juros"],["1am","1% ao mês (simples)"],["selic","SELIC"],["legal","Taxa legal: SELIC − IPCA (Lei 14.905/24)"]], CALC.juros)}</select></label>
+      <label class="f">Juros a partir de<input type="month" data-bind="CALC.jurosDe" value="${esc(CALC.jurosDe)}" placeholder="igual ao início"></label></div>
+    <div class="row" style="justify-content:space-between"><span class="hint">Índices oficiais do Banco Central (séries do SGS), mês a mês. A SELIC já embute correção: ao usar SELIC como juros, prefira "Sem correção".</span><button class="btn primary" data-act="calc-atual" ${CALC.carregando?"disabled":""}>${CALC.carregando?`<span class="spinner"></span>`:"Calcular"}</button></div>
+    ${CALC.erro?`<div class="err">${esc(CALC.erro)}</div>`:""}
+    ${r?`<div class="calc"><div class="res"><div><span class="small muted">Valor corrigido</span><b>${moeda(r.corrigido)}</b></div><div><span class="small muted">Juros (${r.jurosPct.toFixed(2).replace(".",",")}%)</span><b>${moeda(r.juros)}</b></div><div class="fatal"><span class="small muted">Total atualizado</span><b>${moeda(r.total)}</b></div></div>
+      <div class="small muted">Fator de correção ${r.fator.toFixed(6).replace(".",",")} · ${r.memoria.length} mês(es).${r.faltando?` ${r.faltando} mês(es) ainda sem índice publicado ficaram sem correção.`:""}</div>
+      <details><summary class="small gold" style="cursor:pointer">Memória de cálculo</summary><div class="tbl-wrap" style="margin-top:8px"><table class="tbl"><thead><tr><th>Mês</th><th>Índice %</th><th>Juros %</th><th>Fator acumulado</th></tr></thead><tbody>${r.memoria.map(([m,i,j,f])=>`<tr style="cursor:default"><td class="mono">${m.slice(5)}/${m.slice(0,4)}</td><td>${i===null?"—":i.toFixed(2).replace(".",",")}</td><td>${j.toFixed(2).replace(".",",")}</td><td>${f.toFixed(6).replace(".",",")}</td></tr>`).join("")}</tbody></table></div></details>
+      <div class="hint">Estimativa para conferência. Siga o índice e os marcos definidos na decisão ou no contrato.</div></div>`:""}
+  </div></div>`;
+}
+function calcRescisaoHTML(){
+  const r = CALC.rres;
+  return `<div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
+    <div class="grid3"><label class="f">Último salário (R$)<input type="text" inputmode="decimal" data-bind="CALC.salario" value="${esc(CALC.salario)}" placeholder="3.000,00"></label>
+      <label class="f">Admissão<input type="date" data-bind="CALC.admissao" value="${esc(CALC.admissao)}"></label><label class="f">Último dia trabalhado<input type="date" data-bind="CALC.demissao" value="${esc(CALC.demissao)}"></label></div>
+    <div class="grid3"><label class="f">Motivo<select data-bind="CALC.motivo">${opts([["sem_justa","Dispensa sem justa causa"],["pedido","Pedido de demissão"],["justa","Justa causa"],["acordo","Acordo (art. 484-A)"]], CALC.motivo)}</select></label>
+      <label class="f">Aviso prévio<select data-bind="CALC.aviso">${opts([["indenizado","Indenizado"],["trabalhado","Trabalhado"]], CALC.aviso)}</select></label>
+      <label class="f">Férias vencidas não gozadas?<select data-bind="CALC.feriasVencidas">${opts([["nao","Não"],["sim","Sim, 1 período"]], CALC.feriasVencidas)}</select></label></div>
+    <div class="grid3"><label class="f">Saldo do FGTS (extrato)<input type="text" inputmode="decimal" data-bind="CALC.fgts" value="${esc(CALC.fgts)}" placeholder="opcional"></label></div>
+    <div class="row" style="justify-content:space-between"><span class="hint">Simulação com regras gerais da CLT. Não considera horas extras, adicionais, médias de variáveis nem descontos de INSS e IR.</span><button class="btn primary" data-act="calc-resc">Simular</button></div>
+    ${r&&r.erro?`<div class="err">${esc(r.erro)}</div>`:""}
+    ${r&&!r.erro?`<div class="calc"><div class="tbl-wrap"><table class="tbl"><tbody>${r.linhas.map(([n,v])=>`<tr style="cursor:default"><td>${esc(n)}</td><td style="text-align:right"><b>${moeda(v)}</b></td></tr>`).join("")}<tr style="cursor:default"><td><b>Total estimado (bruto)</b></td><td style="text-align:right"><b class="gold">${moeda(r.total)}</b></td></tr></tbody></table></div>
+      <div class="small muted">${r.anos} ano(s) completo(s) · aviso de ${r.diasAviso} dias (Lei 12.506/11). FGTS do mês e da rescisão a depositar: ${moeda(r.fgtsRes)}. ${esc(r.saque)}</div></div>`:""}
+  </div></div>`;
+}
+function vCalculadoras(voltar){
+  const abas = [["atualizacao","Atualização de valores"],["rescisao","Verbas rescisórias"]];
+  return `<div class="head"><div><h1>Calculadoras</h1><div class="sub">Atualização monetária com índices oficiais e simulação de verbas rescisórias.</div></div>${voltar||""}</div>
+  <div class="tabs" role="tablist"><span class="ind"></span>${abas.map(([k,l])=>`<button role="tab" aria-selected="${CALC.aba===k}" data-act="calc-aba" data-a="${k}">${l}</button>`).join("")}</div>
+  ${CALC.aba==="rescisao" ? calcRescisaoHTML() : calcAtualizacaoHTML()}`;
+}
+
+/* ---------- PAINEL DO GESTOR ---------- */
+function vPainel(){
+  const h = hoje(), sem = iso(addDays(new Date(),7));
+  const ativos = S.processos.filter(p=>!["Arquivado"].includes(p.fase));
+  const porArea = Object.keys(AREAS).map(k=>[AREAS[k].nome, ativos.filter(p=>p.area===k).length, AREAS[k].cor]);
+  const porFase = FASES.map(f=>[f, ativos.filter(p=>p.fase===f).length]).filter(x=>x[1]);
+  const pend = S.tarefas.filter(t=>!t.done && t.data);
+  const venc = pend.filter(t=>t.data<h), prox = pend.filter(t=>t.data>=h && t.data<=sem);
+  const feitos = S.tarefas.filter(t=>t.done && t.tipo==="Prazo" && t.concluido_em);
+  const noPrazo = feitos.filter(t=>(t.concluido_em||"").slice(0,10) <= (t.interno || t.data)).length;
+  const pctPrazo = feitos.length ? Math.round(noPrazo/feitos.length*100) : null;
+  const equipe = equipeAtiva().map(u=>[u.nome, pend.filter(t=>t.atribuido_a===u.id).length, pend.filter(t=>t.atribuido_a===u.id && t.data<h).length, S.processos.filter(p=>p.responsavel_id===u.id).length]).sort((a,b)=>b[1]-a[1]);
+  const docsPend = {}; S.documentos.filter(d=>d.status==="Aguardando cliente").forEach(d=>{ const p = procById(d.processo_id); const n = nomeCliente(p); docsPend[n] = (docsPend[n]||0)+1; });
+  const docsLista = Object.entries(docsPend).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const enviados = S.documentos.filter(d=>d.status==="Enviado pelo cliente");
+  const fin = S.financeiro||[]; const venFin = fin.filter(f=>!f.pago_em && f.vencimento<h);
+  const ats = S.atendimentos||[];
+  const barra = (n, max, cor) => `<span class="bar"><i style="width:${max?Math.max(4, n/max*100):0}%;${cor?`background:var(--${cor})`:""}"></i></span>`;
+  const maxA = Math.max(1,...porArea.map(x=>x[1])), maxF = Math.max(1,...porFase.map(x=>x[1])), maxE = Math.max(1,...equipe.map(x=>x[1]));
+  return `<div class="head"><div><h1>Painel do escritório</h1><div class="sub">Visão geral da carteira, dos prazos e da equipe.</div></div><button class="btn" data-act="pdf-carteira-direto">${ICON.pdf}Carteira em PDF</button></div>
+  <div class="stats"><div class="stat"><span>Processos ativos</span><b>${ativos.length}</b><small>${S.processos.length} no total</small></div><div class="stat ${venc.length?"alerta":""}"><span>Prazos vencidos</span><b>${venc.length}</b><small>sem conclusão</small></div><div class="stat"><span>Próximos 7 dias</span><b>${prox.length}</b><small>compromissos</small></div><div class="stat"><span>Cumpridos no prazo interno</span><b>${pctPrazo===null?"—":pctPrazo+"%"}</b><small>${feitos.length} prazo(s) concluído(s)</small></div></div>
+  <div class="painel-grid">
+    <div class="panel"><div class="panel-h"><h2>Por área</h2></div><div class="panel-b barras">${porArea.map(([n,v,c])=>`<div class="br"><span>${n}</span>${barra(v,maxA,c)}<b>${v}</b></div>`).join("")}</div></div>
+    <div class="panel"><div class="panel-h"><h2>Por fase</h2></div><div class="panel-b barras">${porFase.length?porFase.map(([n,v])=>`<div class="br"><span>${esc(n)}</span>${barra(v,maxF)}<b>${v}</b></div>`).join(""):`<span class="small muted">Sem processos ativos.</span>`}</div></div>
+    <div class="panel"><div class="panel-h"><h2>Carga da equipe</h2></div><div class="panel-b barras">${equipe.map(([n,v,vz,ps])=>`<div class="br"><span>${esc(n)}<small class="muted"> · ${ps} proc.</small></span>${barra(v,maxE)}<b>${v}${vz?` <span class="chip danger">${vz}</span>`:""}</b></div>`).join("")||`<span class="small muted">Sem equipe.</span>`}<div class="hint">Atividades pendentes por pessoa; em vermelho, as vencidas.</div></div></div>
+    <div class="panel"><div class="panel-h"><h2>Documentos pendentes</h2>${enviados.length?`<span class="chip warn">${enviados.length} enviado(s) pelo cliente para conferir</span>`:""}</div><div class="panel-b">${docsLista.length?docsLista.map(([n,v])=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>${esc(n)}</span><span class="chip warn">${v} aguardando</span></div>`).join(""):`<span class="small muted">Nenhum documento aguardando cliente.</span>`}</div></div>
+    ${pode("financeiro")?`<div class="panel"><div class="panel-h"><h2>Financeiro</h2><button class="linkbtn" data-act="nav" data-v="financeiro">Abrir</button></div><div class="panel-b"><div class="row" style="justify-content:space-between"><span>Em aberto</span><b>${moeda(fin.filter(f=>!f.pago_em).reduce((s,f)=>s+Number(f.valor),0))}</b></div><div class="row" style="justify-content:space-between;margin-top:6px"><span>Vencido</span><b style="color:var(--danger)">${moeda(venFin.reduce((s,f)=>s+Number(f.valor),0))}</b></div></div></div>`:""}
+    ${pode("atendimentos")||pode("gerenciar_clientes")?`<div class="panel"><div class="panel-h"><h2>Atendimentos</h2><button class="linkbtn" data-act="nav" data-v="atendimentos">Abrir</button></div><div class="panel-b barras">${ATS.map(([k,l])=>`<div class="br"><span>${l}</span>${barra(ats.filter(a=>a.status===k).length, Math.max(1,ats.length))}<b>${ats.filter(a=>a.status===k).length}</b></div>`).join("")}</div></div>`:""}
+  </div>`;
+}
+
+/* ---------- DATAJUD ---------- */
+const DJ = {};
+async function buscarDataJud(pid, silencioso){
+  const p = procById(pid); if(!p) return null;
+  DJ[pid] = {carregando:true}; if(!silencioso && modal) abrirModal(modal);
+  try{
+    const r = await api.servico("datajud", {numero:p.numero});
+    if(r && r.erro) DJ[pid] = {erro:r.erro};
+    else { const ja = new Set(andamentosDe(pid).map(a=>(a.data||"")+"|"+nrm(a.texto).slice(0,60)));
+      const movs = (r.movimentos||[]).map(m=>{ const data = (m.data||"").slice(0,10), texto = m.nome + (m.detalhe?" ("+m.detalhe+")":""); return {data, texto, novo:!ja.has(data+"|"+nrm(texto).slice(0,60)) && !andamentosDe(pid).some(a=>a.data===data && nrm(a.texto).includes(nrm(m.nome)))}; });
+      DJ[pid] = Object.assign({}, r, {movs, quando:Date.now()}); }
+  }catch(e){ DJ[pid] = {erro:P.erroAmigavel(e)}; }
+  if(!silencioso && modal) abrirModal(modal);
+  return DJ[pid];
+}
+function blocoDataJud(p){
+  const d = DJ[p.id], cnj = P.cnjInfo(p.numero||"");
+  if(!cnj.completo) return `<div class="small muted">Cadastre o número CNJ completo para buscar os andamentos no DataJud.</div>`;
+  if(!d) return `<div class="row" style="justify-content:space-between"><span class="small muted">Busque as movimentações oficiais na base pública do CNJ (DataJud).</span><button class="btn" data-act="dj-buscar" data-id="${p.id}">${ICON.refresh}Buscar no DataJud</button></div>`;
+  if(d.carregando) return `<div class="row muted"><span class="spinner"></span> Consultando o DataJud…</div>`;
+  if(d.erro) return `<div class="err">${esc(d.erro)}</div><button class="linkbtn small" data-act="dj-buscar" data-id="${p.id}">Tentar de novo</button>`;
+  if(!d.encontrado) return `<div class="small muted">O DataJud (${esc(d.tribunal||"")}) ainda não tem este processo. A base do CNJ pode levar alguns dias para receber processos novos. <button class="linkbtn small" data-act="dj-buscar" data-id="${p.id}">Buscar de novo</button></div>`;
+  const novos = d.movs.filter(m=>m.novo);
+  return `<div class="dj"><div class="row" style="justify-content:space-between"><span class="small"><b>DataJud · ${esc(d.tribunal)}</b>${d.classe?" · "+esc(d.classe):""}${d.orgao?" · "+esc(d.orgao):""}</span><span class="chip ${novos.length?"warn":"ok"}">${novos.length} novo(s)</span></div>
+    ${novos.length?`<div class="dj-lista">${novos.slice(0,40).map((m,i)=>`<label class="check"><input type="checkbox" data-dj="${i}" checked> <span class="mono small">${fmt(m.data)}</span> ${esc(m.texto)}</label>`).join("")}</div>
+    <div class="row" style="justify-content:space-between"><label class="check"><input type="checkbox" id="dj-vis" checked> Cliente vê no portal</label><button class="btn primary" data-act="dj-importar" data-id="${p.id}">Importar selecionados</button></div>`:`<div class="small muted">Nenhuma movimentação nova em relação ao que já está registrado.</div>`}
+    <div class="hint">A base pública do CNJ é atualizada pelos tribunais e pode ter alguns dias de atraso. Confira sempre no sistema do tribunal.</div></div>`;
+}
+const DJLOTE = {rodando:false, feito:0, total:0, res:[]};
+async function verificarTodosDataJud(){
+  const ps = S.processos.filter(p=>P.cnjInfo(p.numero||"").valido && p.fase!=="Arquivado").slice(0, 40);
+  if(!ps.length){ toast("Nenhum processo com número CNJ válido."); return; }
+  Object.assign(DJLOTE, {rodando:true, feito:0, total:ps.length, res:[]}); render();
+  for(const p of ps){ const r = await buscarDataJud(p.id, true); DJLOTE.feito++; if(r && r.movs){ const n = r.movs.filter(m=>m.novo).length; if(n) DJLOTE.res.push([p.id, n]); } if(view==="processos") render(); }
+  DJLOTE.rodando = false; render();
+  toast(DJLOTE.res.length ? `${DJLOTE.res.length} processo(s) com movimentações novas` : "Nenhuma movimentação nova encontrada");
+}
+function bannerDataJud(){
+  if(!DJLOTE.rodando && !DJLOTE.res.length) return "";
+  if(DJLOTE.rodando) return `<div class="notice row"><span class="spinner"></span> Consultando o DataJud: ${DJLOTE.feito} de ${DJLOTE.total} processos…</div>`;
+  return `<div class="notice"><b>Movimentações novas no DataJud:</b> ${DJLOTE.res.map(([id,n])=>`<button class="linkbtn" data-act="dj-abrir" data-id="${id}">${esc(nomeCliente(procById(id)))} (${n})</button>`).join(" · ")}</div>`;
+}
+
+/* ---------- AGENDA NO CELULAR ---------- */
+function mAgendaCelular(){
+  const tk = S.perfil?.agenda_token, url = tk ? api.agendaUrl(tk) : "";
+  return cab("Agenda no celular", "Seus prazos e audiências no Google Agenda ou no iPhone") + `<div class="sheet-b" style="display:flex;flex-direction:column;gap:14px">
+    ${url?`<label class="f">Link de assinatura (pessoal, não compartilhe)<input type="text" readonly class="mono" value="${esc(url)}" onfocus="this.select()"></label>
+    <div class="row" style="gap:8px"><button class="btn primary" data-act="copiar-txt" data-t="${esc(url)}">${ICON.copy}Copiar link</button><a class="btn" href="${esc(url.replace(/^https:/,"webcal:"))}">Abrir no iPhone / Mac</a><a class="btn" href="https://calendar.google.com/calendar/r/settings/addbyurl" target="_blank" rel="noopener">Abrir Google Agenda</a></div>
+    <div class="small muted"><b>Google Agenda (computador):</b> Outras agendas › + › Do URL › cole o link. <b>iPhone:</b> toque em "Abrir no iPhone" ou vá em Ajustes › Calendário › Contas › Adicionar conta › Outra › Calendário assinado. A agenda atualiza sozinha (o Google leva algumas horas).</div>`:`<div class="notice">O link de assinatura aparece aqui depois da atualização do banco de dados.</div>`}
+    <div class="calc"><b>Sem assinatura:</b> baixe um arquivo com os compromissos de hoje em diante e importe uma vez.<div class="row" style="margin-top:8px"><button class="btn" data-act="agenda-ics">Baixar arquivo .ics</button></div></div>
+  </div><div class="sheet-f"><button class="btn primary" data-act="fechar">Fechar</button></div>`;
+}
+function baixarIcs(){
+  const L2 = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Pauta Juridica//PT-BR","CALSCALE:GREGORIAN"];
+  const e = s => String(s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
+  tarefasVisiveis().filter(t=>!t.done && t.data && t.data>=hoje()).forEach(t=>{ const p = procById(t.processo_id); const d = t.data.replace(/-/g,"");
+    L2.push("BEGIN:VEVENT","UID:"+t.id+"@pauta","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z");
+    if(t.hora && /^\d{1,2}:\d{2}$/.test(t.hora)){ const [h,m] = t.hora.split(":"); L2.push(`DTSTART;TZID=America/Sao_Paulo:${d}T${h.padStart(2,"0")}${m}00`, `DTEND;TZID=America/Sao_Paulo:${d}T${String(Math.min(23,Number(h)+1)).padStart(2,"0")}${m}00`); }
+    else { const n = iso(addDays(parse(t.data),1)).replace(/-/g,""); L2.push("DTSTART;VALUE=DATE:"+d, "DTEND;VALUE=DATE:"+n); }
+    L2.push("SUMMARY:"+e(`${t.tipo}: ${t.titulo||""}${p?" · "+nomeCliente(p):""}`)); if(t.local) L2.push("LOCATION:"+e(t.local)); if(p?.numero) L2.push("DESCRIPTION:"+e("Processo "+p.numero)); L2.push("END:VEVENT"); });
+  L2.push("END:VCALENDAR");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([L2.join("\r\n")], {type:"text/calendar"})); a.download = "pauta-agenda.ics"; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+}
+
+/* ---------- ações da versão 3 ---------- */
+async function acaoV3(a, el){
+  const id = el.dataset.id;
+  switch(a){
+    case "fin-novo": abrirModal({kind:"financeiro"}); return true;
+    case "fin-editar": abrirModal({kind:"financeiro", id}); return true;
+    case "fin-filtro": FIN.filtro = el.dataset.f; render(); return true;
+    case "fin-salvar": {
+      const v = i => document.getElementById(i)?.value?.trim() ?? "";
+      const valor = numBR(v("fn-valor")); if(!valor){ toast("Informe o valor."); return true; } if(!v("fn-venc")){ toast("Informe o vencimento."); return true; }
+      const base = {cliente_id:v("fn-cli")||null, processo_id:v("fn-proc")||null, descricao:v("fn-desc")||"Honorários", valor, forma:v("fn-forma")||null, obs:v("fn-obs")||null};
+      await comErro(async()=>{
+        if(modal.id) await api.atualizar("financeiro", modal.id, Object.assign(base, {vencimento:v("fn-venc")}));
+        else { const n = Math.max(1, Math.min(60, Number(v("fn-parc"))||1)); for(let i=0;i<n;i++){ const d = parse(v("fn-venc")); d.setMonth(d.getMonth()+i); await api.inserir("financeiro", Object.assign({escritorio_id:S.escritorio.id}, base, {descricao: n>1 ? `${base.descricao} · ${i+1}/${n}` : base.descricao, vencimento:iso(d)})); } }
+        await recarregar("financeiro", true); fecharModal(); toast("Cobrança salva"); render(); });
+      return true; }
+    case "fin-pagar": await comErro(async()=>{ await api.atualizar("financeiro", id, {pago_em:hoje()}); await recarregar("financeiro", true); render(); toast("Marcado como recebido"); }); return true;
+    case "fin-desfazer": await comErro(async()=>{ await api.atualizar("financeiro", id, {pago_em:null}); await recarregar("financeiro", true); render(); }); return true;
+    case "fin-recibo": { const f = (S.financeiro||[]).find(x=>x.id===id); if(f) reciboPdf(f); return true; }
+    case "doc-financeiro": {
+      if(!pode("financeiro")){ toast("Seu acesso não inclui o financeiro."); return true; }
+      const r = parcelasDoContrato(); if(!r.linhas.length){ toast("Preencha valor fixo, entrada ou parcelas (ex.: 4x de R$ 500,00)."); return true; }
+      await comErro(async()=>{ for(const l of r.linhas) await api.inserir("financeiro", Object.assign({escritorio_id:S.escritorio.id, cliente_id:r.cliente_id||null, processo_id:r.processo_id||null, forma:PC.forma||null}, l)); await recarregar("financeiro", true); toast(`${r.linhas.length} lançamento(s) no financeiro`); });
+      return true; }
+    case "at-novo": abrirModal({kind:"atendimento"}); return true;
+    case "at-salvar": {
+      const v = i => document.getElementById(i)?.value?.trim() ?? "";
+      if(!v("am-nome")){ toast("Informe o nome."); return true; }
+      await comErro(async()=>{ await api.inserir("atendimentos", {escritorio_id:S.escritorio.id, nome:v("am-nome"), telefone:v("am-tel")||null, email:v("am-email")||null, area:v("am-area")||null, relato:v("am-relato")||null, origem:v("am-origem")||"manual"}); await recarregar("atendimentos", true); fecharModal(); render(); });
+      return true; }
+    case "at-cliente": {
+      const at = (S.atendimentos||[]).find(x=>x.id===id); if(!at) return true;
+      await comErro(async()=>{ const c = await api.inserir("clientes", {escritorio_id:S.escritorio.id, nome:at.nome, tipo:"PF", telefone:at.telefone, email:at.email, obs:at.relato ? "Primeiro contato: "+at.relato.slice(0,500) : null}); await api.atualizar("atendimentos", id, {cliente_id:c.id, status:"fechado"}); await Promise.all([recarregar("clientes",true), recarregar("atendimentos",true)]); render(); toast("Cliente cadastrado"); abrirModal({kind:"cliente", id:c.id}); });
+      return true; }
+    case "calc-aba": CALC.aba = el.dataset.a; refazer(); return true;
+    case "calc-atual": await calcularAtualizacao(); return true;
+    case "calc-resc": calcularRescisao(); return true;
+    case "pdf-carteira-direto": pdfCarteira({area:""}); return true;
+    case "dj-buscar": await buscarDataJud(id); return true;
+    case "dj-abrir": abrirModal({kind:"detalhe", id, vivo:true, aba:"andamentos"}); return true;
+    case "dj-todos": await verificarTodosDataJud(); return true;
+    case "dj-importar": {
+      const d = DJ[id]; if(!d || !d.movs) return true; const novos = d.movs.filter(m=>m.novo);
+      const sel = [...document.querySelectorAll("[data-dj]")].filter(x=>x.checked).map(x=>novos[Number(x.dataset.dj)]).filter(Boolean);
+      if(!sel.length){ toast("Selecione ao menos uma movimentação."); return true; }
+      const vis = $("#dj-vis")?.checked ?? true;
+      await comErro(async()=>{ for(const m of sel) await api.inserir("andamentos", {escritorio_id:S.escritorio.id, processo_id:id, data:m.data||hoje(), texto:m.texto, visivel_cliente:vis}); await recarregar("andamentos", true); sel.forEach(m=>m.novo=false); DJLOTE.res = DJLOTE.res.filter(x=>x[0]!==id); toast(`${sel.length} andamento(s) importado(s)`); if(modal) abrirModal(modal); });
+      return true; }
+    case "agenda-celular": abrirModal({kind:"agendaCelular"}); return true;
+    case "agenda-ics": baixarIcs(); return true;
+    case "ver-arquivo": await verArquivo(el.dataset.c); return true;
+  }
+  return false;
+}
+function mAtendimento(){
+  return cab("Registrar atendimento") + `<form class="sheet-b" autocomplete="off"><div class="grid2">
+    <label class="f span2">Nome<input type="text" id="am-nome"></label>
+    <label class="f">Celular<input type="tel" id="am-tel"></label><label class="f">E-mail<input type="email" id="am-email"></label>
+    <label class="f">Área<select id="am-area"><option value="">—</option>${opts(Object.entries(AREAS).map(([k,v])=>[k,v.nome]))}</select></label>
+    <label class="f">Origem<select id="am-origem">${opts([["manual","Contato direto"],["indicacao","Indicação"],["instagram","Instagram"],["site","Site"],["whatsapp","WhatsApp"]])}</select></label>
+    <label class="f span2">Relato<textarea id="am-relato" rows="4"></textarea></label></div></form>
+    <div class="sheet-f"><button class="btn" data-act="fechar">Cancelar</button><button class="btn primary" data-act="at-salvar">Salvar</button></div>`;
+}
+
 /* ---------- DIREITO GERAL ---------- */
 function listaTemas(){
   const t = DG.termo.trim();
@@ -1290,7 +1730,7 @@ function vRelatorios(){
 }
 
 /* ---------- EQUIPE E ACESSOS (convites por link) ---------- */
-function linkConvite(c){ return location.origin + location.pathname + "?convite=" + encodeURIComponent(c.token); }
+function linkConvite(c){ return location.origin + location.pathname + "?convite=" + encodeURIComponent(c.token) + (c.papel==="cliente" ? "&portal=1" : ""); }
 function situacaoConvite(c){ if(c.usado_em) return ["Usado","ok"]; if(c.expira_em && Date.parse(c.expira_em) < Date.now()) return ["Expirado","danger"]; return ["Aguardando","warn"]; }
 function vEquipe(){
   const dc = (P.cfg().docs || {});
@@ -1353,7 +1793,7 @@ function mConvite(m){
   </div><div class="sheet-f"><button class="btn" data-act="fechar">Cancelar</button><button class="btn primary" data-act="salvar-convite">Gerar link</button></div>`;
 }
 function lerConviteForm(){ const c = modal.c; c.nome = $("#cv-n").value.trim(); c.email = $("#cv-e").value.trim(); c.papel = $("#cv-p").value; c.dias = Number($("#cv-d").value); const cl = $("#cv-cli"); if(cl) c.cliente_id = cl.value; const pm = Object.assign({}, c.permissoes); document.querySelectorAll("[data-cperm]").forEach(x=>pm[x.dataset.cperm] = x.checked); c.permissoes = pm; return c; }
-function textoConvite(c){ return `Olá${c.nome?", "+P.primeiroNome(c.nome):""}! Você foi convidado(a) para acessar ${c.papel==="cliente"?"o acompanhamento dos seus processos com":"a área da equipe do"} ${S.escritorio?.nome||"escritório"}.\n\n1. Abra o link: ${c.link}\n2. Confira seu nome${c.email?" e use o e-mail "+c.email:""}\n3. Crie sua senha\n\n${c.expira_em?`O link vale até ${P.fmt(c.expira_em.slice(0,10))} e pode ser usado uma vez.`:"O link pode ser usado uma vez."} Depois disso, é só entrar pelo mesmo endereço com e-mail e senha.`; }
+function textoConvite(c){ return `Olá${c.nome?", "+P.primeiroNome(c.nome):""}! Você foi convidado(a) para acessar ${c.papel==="cliente"?"o acompanhamento dos seus processos com":"a área da equipe do"} ${S.escritorio?.nome||"escritório"}.\n\n1. Abra o link: ${c.link}\n2. Confira seu nome${c.email?" e use o e-mail "+c.email:""}\n3. Crie sua senha\n\n${c.expira_em?`O link vale até ${P.fmt(c.expira_em.slice(0,10))} e pode ser usado uma vez.`:"O link pode ser usado uma vez."} ${c.papel==="cliente" ? "Para acessar depois, entre em: "+location.origin+location.pathname+"?portal=1" : "Depois disso, é só entrar pelo mesmo endereço com e-mail e senha."}`; }
 function mCliente(m){
   const c = m.c || (m.c = m.id ? Object.assign({}, cliById(m.id)) : {tipo:"PF"});
   const ps = m.id ? S.processos.filter(p=>p.cliente_id===m.id) : [];
@@ -1462,26 +1902,11 @@ function mLeitor(m){
 }
 function leitorProc(){ const s = $("#lt-proc"); if(s && s.value) modal.processo_id = s.value; return modal.processo_id || ""; }
 /* ---------- PORTAL DO CLIENTE ---------- */
-function vPortal(){
-  const pt = S.portal;
-  if(!pt) return `<div class="panel"><div class="empty"><span class="spinner"></span><p>Carregando seus processos…</p></div></div>`;
-  if(!pt.vinculado) return `<div class="portal-hero"><h1>Olá, ${esc(P.primeiroNome(S.perfil.nome))}</h1><p class="muted" style="margin:0">Seu acesso está ativo. O escritório <b class="gold">${esc(pt.escritorio)}</b> ainda vai vincular seus processos ao seu cadastro. Assim que isso acontecer, eles aparecem aqui.</p></div>`;
-  const etapa = f => Math.max(0, ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento"].indexOf(f));
-  return `<div class="portal-hero"><span class="small gold" style="text-transform:uppercase;letter-spacing:.12em;font-weight:600">${esc(pt.escritorio)}</span><h1>Olá, ${esc(P.primeiroNome(pt.cliente||S.perfil.nome))}</h1><p class="muted" style="margin:0">Aqui você acompanha seus processos. Atualizamos sempre que há uma novidade.</p></div>
-  ${(pt.processos||[]).length?pt.processos.map(p=>`<div class="panel"><div class="panel-h"><div><div class="mono">${esc(p.numero||"")}</div><div class="row" style="margin-top:4px">${chipArea(p.area)}<span class="small muted">${esc(p.vara||"")}${p.parte_contraria?" · contra "+esc(p.parte_contraria):""}</span></div></div><button class="btn" data-act="pdf-portal" data-id="${p.id}">${ICON.pdf}<span class="lbl">Baixar resumo</span></button></div>
-    <div class="panel-b" style="display:flex;flex-direction:column;gap:16px">
-      <div><h3>Fase atual: <span class="gold">${esc(p.fase||"—")}</span></h3>${["Acordo","Suspenso","Arquivado"].includes(p.fase)?"":`<div class="steps">${[0,1,2,3,4].map(i=>`<i class="${i<=etapa(p.fase)?"on":""}"></i>`).join("")}</div><div class="steps-l"><span>Início</span><span>Instrução</span><span>Sentença</span><span>Recurso</span><span>Execução</span></div>`}</div>
-      ${p.resumo?`<div class="notice" style="font-size:.95rem;color:var(--ink)">${esc(p.resumo)}</div>`:""}
-      ${(p.audiencias||[]).length?`<div><h3 style="margin-bottom:8px">Próximas audiências</h3>${p.audiencias.map(a=>{ const dt = parse(a.data); return `<div class="next-card" style="cursor:default"><div class="cal"><span>${MESES[dt.getMonth()]}</span><b>${pad(dt.getDate())}</b></div><div><b>${esc(a.titulo||"Audiência")}</b><div class="small muted">${a.hora?esc(a.hora)+" · ":""}${esc(a.modalidade||"")} ${a.local?"· "+esc(a.local):""}</div></div></div>`; }).join("")}</div>`:""}
-      <div><h3 style="margin-bottom:10px">Movimentações</h3>${(p.andamentos||[]).length?`<div class="timeline">${p.andamentos.map(a=>`<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div></div>`).join("")}</div>`:`<span class="small muted">Nenhuma movimentação registrada ainda.</span>`}</div>
-      ${(p.documentos||[]).length?`<div><h3 style="margin-bottom:6px">Documentos</h3>${p.documentos.map(d=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>${esc(d.nome)}</span><span class="chip ${d.status==="Aguardando cliente"?"warn":"neutral"}">${d.status==="Aguardando cliente"?"Precisamos que você envie":esc(d.status)}</span></div>`).join("")}</div>`:""}
-    </div></div>`).join(""):`<div class="panel"><div class="empty"><p>Nenhum processo vinculado ao seu cadastro.</p></div></div>`}`;
-}
 
 /* ---------- modais ---------- */
 function abrirModal(m){
   modal = m;
-  const fn = {tarefa:mTarefa, processo:mProcesso, detalhe:mDetalhe, cliente:mCliente, perfil:mPerfil, mais:mMais, usuario:mUsuario, comunicar:mComunicar, leitor:mLeitor, com:mCom, aparencia:mAparencia, convite:mConvite, novaSenha:mNovaSenha, docgerado:mDocGerado, modelo:mModelo}[m.kind];
+  const fn = {tarefa:mTarefa, processo:mProcesso, detalhe:mDetalhe, cliente:mCliente, perfil:mPerfil, mais:mMais, usuario:mUsuario, comunicar:mComunicar, leitor:mLeitor, com:mCom, aparencia:mAparencia, convite:mConvite, novaSenha:mNovaSenha, docgerado:mDocGerado, modelo:mModelo, financeiro:mFinanceiro, atendimento:mAtendimento, agendaCelular:mAgendaCelular}[m.kind];
   const sheet = $("#sheet");
   sheet.className = "sheet" + (["detalhe","leitor"].includes(m.kind)?" wide":"") + (m.kind==="docgerado"?" wide docview":"");
   sheet.innerHTML = fn(m);
@@ -1618,11 +2043,11 @@ function mDetalhe(m){
     <div class="notice"><b>O cliente vê:</b> ${esc(p.resumo_cliente||"Nenhum resumo para o cliente. Edite o processo para escrever um.")}</div>`;
   if(aba==="prazos") corpo = `<div class="row" style="justify-content:flex-end">${pode("criar_tarefas")?`<button class="btn" data-act="nova-tarefa" data-tipo="Audiência" data-proc="${p.id}">${ICON.plus}Audiência</button><button class="btn" data-act="nova-tarefa" data-tipo="Peça" data-proc="${p.id}">${ICON.plus}Tarefa</button>`:""}<button class="btn primary" data-act="nova-tarefa" data-tipo="${pode("criar_tarefas")?"Prazo":"Peça"}" data-proc="${p.id}">${ICON.plus}${pode("criar_tarefas")?"Prazo":"Atividade"}</button></div>
     <div class="panel"><div class="pauta">${ts.length?ts.map(itemTarefa).join(""):`<div class="empty small">Nenhum compromisso neste processo.</div>`}</div></div>`;
-  if(aba==="andamentos") corpo = `${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="date" id="and-data" value="${hoje()}" style="width:auto"><input type="text" id="and-txt" placeholder="Ex.: Juntada de contestação"><button class="btn primary" data-act="add-andamento" data-id="${p.id}">Incluir</button></div>
+  if(aba==="andamentos") corpo = `${podeReg?`<div class="calc dj-box">${blocoDataJud(p)}</div>`:""}${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="date" id="and-data" value="${hoje()}" style="width:auto"><input type="text" id="and-txt" placeholder="Ex.: Juntada de contestação"><button class="btn primary" data-act="add-andamento" data-id="${p.id}">Incluir</button></div>
       <label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label></div>`:""}
     ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span>${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</div><div>${esc(a.texto)}</div>${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button><button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
   if(aba==="documentos") corpo = `${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="text" id="doc-nome" placeholder="Ex.: Procuração, CTPS, contrato"><button class="btn primary" data-act="add-doc" data-id="${p.id}">Incluir</button></div><label class="check"><input type="checkbox" id="doc-vis" checked> Visível para o cliente (ele vê que o documento é necessário)</label></div>`:""}
-    <div class="doclist">${docs.length?docs.map(d=>`<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}</div></div><select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`).join(""):`<span class="small muted">Nenhum documento listado.</span>`}</div>`;
+    <div class="doclist">${docs.length?docs.map(d=>`<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}${d.status==="Enviado pelo cliente"?` <span class="chip warn">novo</span>`:""}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}${d.arquivo?` · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.arquivo)}">Ver arquivo</button>`:""}</div></div><select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`).join(""):`<span class="small muted">Nenhum documento listado.</span>`}</div>`;
   if(aba==="envios") corpo = coms.length?`<div class="timeline">${coms.map(c=>`<div class="ev"><div class="small muted">${new Date(c.enviado_em||c.criado_em).toLocaleString("pt-BR")} · ${esc(nomePerfil(c.enviado_por||c.criado_por))}</div><div class="pre" style="max-height:140px;margin-top:4px">${esc(c.texto||"")}</div></div>`).join("")}</div>`:`<span class="small muted">Nenhuma mensagem preparada para este processo.</span>`;
   return cab(`<span class="mono" style="font-size:1.05rem">${esc(p.numero||"Processo sem número")}</span>`, `${chipArea(p.area)} <span class="chip neutral">${esc(p.fase||"")}</span> ${info.completo?esc(info.segmento):""}`) + `<div class="sheet-b">
     <div class="row">${pode("enviar_cliente")?`<button class="btn primary" data-act="comunicar" data-id="${p.id}">${ICON.send}Mensagem ao cliente</button>`:""}${podeReg?`<button class="btn" data-act="ler-pdf" data-proc="${p.id}">${ICON.scan}Ler PDF</button>`:""}${pode("gerar_relatorios")?`<button class="btn" data-act="pdf-processo" data-id="${p.id}">${ICON.pdf}PDF</button>`:""}${pode("editar_processos")?`<button class="btn ghost" data-act="editar-processo" data-id="${p.id}">Editar</button>`:""}</div>
@@ -1697,6 +2122,7 @@ document.addEventListener("click", async e => {
   const a = el.dataset.act, id = el.dataset.id;
   if(el.tagName==="SELECT" || (el.tagName==="INPUT" && el.type!=="checkbox")) return;
   if(el.tagName==="A") return;
+  if(/^(fin-|at-|dj-|agenda-)|^(calc-aba|calc-atual|calc-resc|ver-arquivo|pdf-carteira-direto|doc-financeiro)$/.test(a) && await acaoV3(a, el)) return;
   if(/^(pc-|doc-|radar-)|^copiar-txt-el$/.test(a) && await acaoPecas(a, el)) return;
   switch(a){
     /* tela inicial */
@@ -1853,6 +2279,14 @@ function lerUsuarioForm(){ const u = modal.u; u.papel = $("#u-papel").value; u.s
 document.addEventListener("submit", async e => {
   e.preventDefault();
   const fid = e.target.id;
+  if(fid==="f-atendimento"){
+    const g = id => (document.getElementById(id)?.value || "").trim();
+    const d = {c:L.atend.codigo, p_nome:g("at-nome"), p_telefone:g("at-tel"), p_email:g("at-email"), p_area:g("at-area"), p_relato:g("at-relato")};
+    if(!d.p_telefone && !d.p_email){ L.erroForm = "Informe um celular ou e-mail para retorno."; mostrarInicio(); return; }
+    L.enviando = true; L.erroForm = ""; mostrarInicio();
+    try{ await api.rpc("novo_atendimento", d); L.atend.enviado = true; L.atend.nome = d.p_nome; }catch(err){ L.erroForm = P.erroAmigavel(err); }
+    L.enviando = false; mostrarInicio(); return;
+  }
   if(["f-login","f-criar","f-recuperar","f-convite"].includes(fid)){
     const fd = {}; e.target.querySelectorAll("input").forEach(x=>{ if(x.id) fd[x.id] = x.value; });
     const v = i => (fd[i] || "").trim();
@@ -1877,7 +2311,7 @@ document.addEventListener("submit", async e => {
 });
 document.addEventListener("input", e => {
   const el = e.target, b = el.dataset.bind;
-  if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH,DG,PC})[o][k] = el.value; return; }
+  if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH,DG,PC,FIN,CALC})[o][k] = el.value; return; }
   if(el.id==="dg-busca"){ DG.termo = el.value; const l = $("#dg-lista"); if(l) l.innerHTML = listaTemas(); return; }
   if(el.dataset.calc && el.type!=="checkbox"){ L.calc[el.dataset.calc] = el.value; const pos = el.selectionStart; const idEl = el.id; mostrarInicio(); const n = document.getElementById(idEl); if(n && n.type!=="date"){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(_){} } return; }
   if(el.id==="cnj-in"){ L.cnj = P.mascaraCNJ(el.value); mostrarInicio(); const n = $("#cnj-in"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); return; }
@@ -1888,9 +2322,12 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", async e => {
   const el = e.target;
+  if(el.dataset.file && el.dataset.file.startsWith("portal")){ await enviarPortal(el.dataset.file, el.files[0], el); el.value = ""; return; }
   if(el.dataset.file){ await receberArquivo(el.dataset.file, el.files[0], el.dataset.proc); el.value = ""; return; }
+  if(el.dataset.act==="at-status"){ await comErro(async()=>{ await api.atualizar("atendimentos", el.dataset.id, {status:el.value}); await recarregar("atendimentos", true); render(); }); return; }
+  if(el.dataset.bind && el.dataset.re && el.tagName==="INPUT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,PC,FIN,CALC})[o][k] = el.value; pcMudou(el.dataset.re); return; }
   if(el.dataset.calc){ L.calc[el.dataset.calc] = el.type==="checkbox" ? el.checked : el.value; mostrarInicio(); return; }
-  if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,PC})[o][k] = el.value; if(el.dataset.re) pcMudou(el.dataset.re); return; }
+  if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,PC,FIN,CALC})[o][k] = el.value; if(el.dataset.re) pcMudou(el.dataset.re); return; }
   if(el.id==="a-logo" && el.files[0]){ const f = el.files[0]; const img = new Image(); img.onload = ()=>{ const r = Math.min(1, 420/img.width, 140/img.height); const c = document.createElement("canvas"); c.width = Math.round(img.width*r); c.height = Math.round(img.height*r); c.getContext("2d").drawImage(img,0,0,c.width,c.height); LOGO_TMP = c.toDataURL("image/png"); const pv = $("#a-logo-prev"); if(pv){ pv.src = LOGO_TMP; pv.hidden = false; } URL.revokeObjectURL(img.src); }; img.src = URL.createObjectURL(f); return; }
   if(el.id==="daily-dia"){ D.dia = el.value; render(); return; }
   if(el.id==="l-papel"){ L.papelPedido = el.value; return; }

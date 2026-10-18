@@ -11,7 +11,7 @@ P.AREAS = {
 };
 P.FASES = ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento","Acordo","Suspenso","Arquivado"];
 P.TIPOS = ["Prazo","Audiência","Peça","Diligência","Reunião"];
-P.DOC_STATUS = ["Rascunho","Aguardando cliente","Assinado","Protocolado","Recebido"];
+P.DOC_STATUS = ["Rascunho","Aguardando cliente","Enviado pelo cliente","Recebido","Assinado","Protocolado"];
 P.PAPEIS = {gestor:"Gestor", advogado:"Advogado(a)", estagiario:"Estagiário(a)", cliente:"Cliente"};
 P.PERMISSOES = [
   ["ver_todos_processos","Ver todos os processos","Sem isso, vê só os processos em que é responsável ou tem atividade atribuída."],
@@ -24,13 +24,15 @@ P.PERMISSOES = [
   ["revisar_minutas","Revisar minutas","Usar a revisão de comentários de contratos."],
   ["gerar_relatorios","Gerar relatórios em PDF","Pauta, carteira e relatórios de processos."],
   ["enviar_cliente","Preparar mensagens a clientes","Montar o resumo do andamento para copiar e enviar."],
-  ["gerenciar_equipe","Gerenciar equipe","Criar links de convite, mudar funções e acessos, ajustes do escritório."]
+  ["gerenciar_equipe","Gerenciar equipe","Criar links de convite, mudar funções e acessos, ajustes do escritório."],
+  ["financeiro","Financeiro","Ver e lançar honorários, parcelas e recibos."],
+  ["atendimentos","Atendimentos","Ver pedidos de primeira consulta e transformar em clientes."]
 ];
 P.PERMISSOES_CLIENTE = [["ver_documentos","Ver documentos","Lista de documentos marcados como visíveis."],["ver_audiencias","Ver audiências","Datas e locais das próximas audiências."]];
 P.PADRAO = {
   gestor:Object.fromEntries(P.PERMISSOES.map(([k])=>[k,true])),
-  advogado:{ver_todos_processos:true,editar_processos:true,registrar_andamentos:true,excluir_registros:false,gerenciar_clientes:true,ver_agenda_equipe:true,criar_tarefas:true,revisar_minutas:true,gerar_relatorios:true,enviar_cliente:true,gerenciar_equipe:false},
-  estagiario:{ver_todos_processos:false,editar_processos:false,registrar_andamentos:true,excluir_registros:false,gerenciar_clientes:false,ver_agenda_equipe:false,criar_tarefas:false,revisar_minutas:false,gerar_relatorios:false,enviar_cliente:false,gerenciar_equipe:false},
+  advogado:{ver_todos_processos:true,editar_processos:true,registrar_andamentos:true,excluir_registros:false,gerenciar_clientes:true,ver_agenda_equipe:true,criar_tarefas:true,revisar_minutas:true,gerar_relatorios:true,enviar_cliente:true,gerenciar_equipe:false,financeiro:false,atendimentos:true},
+  estagiario:{ver_todos_processos:false,editar_processos:false,registrar_andamentos:true,excluir_registros:false,gerenciar_clientes:false,ver_agenda_equipe:false,criar_tarefas:false,revisar_minutas:false,gerar_relatorios:false,enviar_cliente:false,gerenciar_equipe:false,financeiro:false,atendimentos:false},
   cliente:{ver_documentos:true,ver_audiencias:true}
 };
 P.PRAZOS_COMUNS = {

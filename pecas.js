@@ -70,6 +70,43 @@ P.TESES = [
   {id:"c_cobranca", area:"civel", titulo:"Inadimplemento e cobrança", fundamento:"CC, arts. 389, 394 e 395",
    texto:"A Ré deixou de pagar a quantia devida no vencimento, conforme documentos anexos, constituindo-se em mora e respondendo pelo valor principal, correção monetária, juros e honorários.",
    pedido:"a condenação ao pagamento do débito, com correção monetária e juros de mora"},
+  // defesas e recursos
+  {id:"c_preliminares", area:"civel", titulo:"Preliminares", fundamento:"CPC, art. 337",
+   texto:"Antes do mérito, a Ré aponta questões preliminares que impedem o exame do pedido: [indicar, por exemplo, ilegitimidade de parte, inépcia da inicial, incompetência, falta de interesse de agir ou prescrição], conforme se demonstra.",
+   pedido:"o acolhimento das preliminares, com a extinção do processo sem resolução do mérito"},
+  {id:"c_impugna_gratuidade", area:"civel", titulo:"Impugnação à justiça gratuita", fundamento:"CPC, art. 100",
+   texto:"A parte autora não comprovou a insuficiência de recursos alegada, e há elementos nos autos que indicam capacidade financeira para arcar com as custas do processo.",
+   pedido:"a revogação da gratuidade de justiça concedida à parte autora"},
+  {id:"c_aborrecimento", area:"civel", titulo:"Ausência de dano moral (mero aborrecimento)", fundamento:"CF, art. 5º, X; CC, arts. 186 e 927",
+   texto:"Os fatos narrados configuram, no máximo, aborrecimento do cotidiano, sem prova de ofensa a direito da personalidade, o que não gera dever de indenizar.",
+   pedido:"a improcedência do pedido de indenização por danos morais"},
+  {id:"c_onus_autor", area:"civel", titulo:"Ônus da prova da parte autora", fundamento:"CPC, art. 373, I",
+   texto:"Cabe à parte autora provar o fato constitutivo do seu direito, o que não ocorreu: os documentos juntados não demonstram as alegações da inicial.",
+   pedido:"a improcedência dos pedidos"},
+  {id:"c_replica", area:"civel", titulo:"Impugnação aos argumentos da defesa", fundamento:"CPC, arts. 350 e 351",
+   texto:"As alegações da contestação não afastam os fatos e fundamentos da inicial. Os documentos juntados pela parte contrária não comprovam o que foi alegado e, em parte, até confirmam a versão do(a) Autor(a).",
+   pedido:"a rejeição das preliminares e a procedência integral dos pedidos iniciais"},
+  {id:"c_recurso_admissivel", area:"civel", titulo:"Tempestividade e preparo", fundamento:"CPC, arts. 1.003, § 5º, e 1.007",
+   texto:"O recurso é tempestivo, interposto dentro do prazo de 15 dias úteis, e o preparo foi recolhido conforme guia anexa (ou a parte é beneficiária da justiça gratuita).",
+   pedido:"o conhecimento do recurso"},
+  {id:"c_reforma", area:"civel", titulo:"Razões para reformar a sentença", fundamento:"CPC, art. 1.010",
+   texto:"A sentença merece reforma, pois [indicar o ponto da decisão] não considerou corretamente as provas e o direito aplicável, conforme se demonstra a seguir.",
+   pedido:"o provimento do recurso, para reformar a sentença"},
+  {id:"t_prescricao", area:"trabalhista", titulo:"Prescrição quinquenal", fundamento:"CF, art. 7º, XXIX; CLT, art. 11",
+   texto:"Estão prescritas as pretensões relativas ao período anterior aos cinco anos contados do ajuizamento da ação.",
+   pedido:"a pronúncia da prescrição quinquenal, com a extinção dos pedidos anteriores a esse marco"},
+  {id:"t_jornada_ok", area:"trabalhista", titulo:"Jornada registrada e paga", fundamento:"CLT, arts. 59 e 74, § 2º",
+   texto:"A jornada do(a) Reclamante foi registrada em controles de ponto válidos, e as horas extras eventualmente prestadas foram pagas ou compensadas, conforme documentos anexos.",
+   pedido:"a improcedência do pedido de horas extras e reflexos"},
+  {id:"t_quitacao", area:"trabalhista", titulo:"Verbas rescisórias pagas", fundamento:"CLT, art. 477",
+   texto:"As verbas rescisórias foram pagas no prazo legal, conforme termo de rescisão e comprovante de pagamento anexos.",
+   pedido:"a improcedência dos pedidos de verbas rescisórias e da multa do art. 477 da CLT"},
+  {id:"t_recurso_admissivel", area:"trabalhista", titulo:"Tempestividade e preparo", fundamento:"CLT, arts. 895 e 899",
+   texto:"O recurso é tempestivo, interposto no prazo de 8 dias úteis, com depósito recursal e custas recolhidos quando devidos, conforme guias anexas.",
+   pedido:"o conhecimento do recurso ordinário"},
+  {id:"t_reforma", area:"trabalhista", titulo:"Razões para reformar a sentença", fundamento:"CLT, art. 895, I",
+   texto:"A sentença merece reforma, pois [indicar o ponto da decisão] não considerou corretamente a prova produzida e a legislação aplicável, conforme se demonstra.",
+   pedido:"o provimento do recurso, para reformar a sentença"},
   // criminal
   {id:"p_inepcia", area:"criminal", titulo:"Inépcia da denúncia", fundamento:"CPP, arts. 41 e 395, I",
    texto:"A denúncia não descreve de forma individualizada a conduta atribuída ao(à) Acusado(a), o que impede o exercício da ampla defesa e impõe a sua rejeição.",
@@ -94,6 +131,12 @@ P.MODELOS_PECA = {
   civ_consumidor:{area:"civel", nome:"Indenizatória · consumidor", acao:"AÇÃO INDENIZATÓRIA POR DANOS MORAIS E MATERIAIS", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL / JUIZADO ESPECIAL CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"propor a presente", teses:["c_consumo","c_inversao","c_moral","c_material"], pedidosFixos:["a citação da Ré para, querendo, apresentar defesa","a condenação da Ré ao pagamento das custas processuais e honorários advocatícios","a produção de todas as provas admitidas em direito"]},
   civ_cobranca:{area:"civel", nome:"Ação de cobrança", acao:"AÇÃO DE COBRANÇA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"propor a presente", teses:["c_cobranca"], pedidosFixos:["a citação da Ré para pagar ou apresentar defesa","a condenação da Ré ao pagamento das custas e honorários advocatícios","a produção de todas as provas admitidas em direito"]},
   civ_obrigacao:{area:"civel", nome:"Obrigação de fazer com tutela de urgência", acao:"AÇÃO DE OBRIGAÇÃO DE FAZER COM PEDIDO DE TUTELA DE URGÊNCIA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"propor a presente", teses:["c_tutela"], pedidosFixos:["a citação da Ré para cumprir a obrigação e, querendo, apresentar defesa","a fixação de multa diária para o caso de descumprimento","a condenação da Ré ao pagamento das custas e honorários advocatícios","a produção de todas as provas admitidas em direito"]},
+  trab_contestacao:{area:"trabalhista", nome:"Contestação trabalhista", acao:"CONTESTAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DO TRABALHO DA ___ VARA DO TRABALHO DE {cidade}", autor:"Reclamada", reu:"Reclamante", verbo:"apresentar a sua", teses:["t_prescricao","t_jornada_ok","t_quitacao"], pedidosFixos:["a improcedência dos pedidos","a condenação do(a) Reclamante em honorários de sucumbência, nos termos do art. 791-A da CLT","a produção de todas as provas admitidas em direito"], intermediaria:true},
+  trab_ro:{area:"trabalhista", nome:"Recurso ordinário", acao:"RECURSO ORDINÁRIO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DO TRABALHO DA ___ VARA DO TRABALHO DE {cidade}", autor:"Recorrente", reu:"Recorrido(a)", verbo:"interpor o presente", teses:["t_recurso_admissivel","t_reforma"], pedidosFixos:["a intimação da parte contrária para contrarrazões e a remessa dos autos ao Tribunal Regional do Trabalho"], intermediaria:true},
+  civ_contestacao:{area:"civel", nome:"Contestação (cível)", acao:"CONTESTAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Ré", reu:"Autor(a)", verbo:"apresentar a sua", teses:["c_preliminares","c_onus_autor","c_aborrecimento"], pedidosFixos:["a improcedência dos pedidos","a condenação da parte autora ao pagamento das custas e honorários advocatícios","a produção de todas as provas admitidas em direito"], intermediaria:true},
+  civ_replica:{area:"civel", nome:"Réplica", acao:"RÉPLICA À CONTESTAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Autor(a)", reu:"Ré", verbo:"apresentar a sua", teses:["c_replica"], pedidosFixos:["a produção das provas já requeridas na inicial"], intermediaria:true},
+  civ_apelacao:{area:"civel", nome:"Apelação", acao:"APELAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Apelante", reu:"Apelado(a)", verbo:"interpor a presente", teses:["c_recurso_admissivel","c_reforma"], pedidosFixos:["a intimação da parte contrária para contrarrazões e a remessa dos autos ao Tribunal de Justiça"], intermediaria:true},
+  civ_manifestacao:{area:"civel", nome:"Manifestação (genérica)", acao:"MANIFESTAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {cidade}", autor:"Parte", reu:"Parte contrária", verbo:"apresentar a presente", teses:[], pedidosFixos:["o recebimento da presente manifestação e o prosseguimento do feito"], intermediaria:true},
   crim_resposta:{area:"criminal", nome:"Resposta à acusação", acao:"RESPOSTA À ACUSAÇÃO", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CRIMINAL DA COMARCA DE {cidade}", autor:"Acusado(a)", reu:"Ministério Público", verbo:"apresentar, no prazo legal, a sua", teses:["p_inepcia","p_absolvicao","p_testemunhas"], pedidosFixos:[], defesa:true},
   crim_liberdade:{area:"criminal", nome:"Pedido de revogação da preventiva", acao:"PEDIDO DE REVOGAÇÃO DE PRISÃO PREVENTIVA", juizo:"EXCELENTÍSSIMO(A) SENHOR(A) JUIZ(A) DE DIREITO DA ___ VARA CRIMINAL DA COMARCA DE {cidade}", autor:"Acusado(a)", reu:"Ministério Público", verbo:"formular o presente", teses:["p_preventiva","p_cautelares"], pedidosFixos:["a expedição do alvará de soltura"], defesa:true}
 };
@@ -167,14 +210,19 @@ P.montarPeca = function(o){
   const crono = P.cronologia(o.cronologia);
   const pedidos = [].concat(teses.map(t=>t.pedido).filter(Boolean), o.pedidos || []);
   let c = `<p class="juizo ni">${e(juizo)}</p>`;
-  if(o.numero) c += `<p class="ni"><b>Processo nº ${e(o.numero)}</b></p>`;
+  if(o.numero && !M.intermediaria) c += `<p class="ni"><b>Processo nº ${e(o.numero)}</b></p>`;
+  if(M.intermediaria){
+    c += `<p class="ni"><b>${e((o.cliente?.nome||"").toUpperCase())||F("cliente")}</b>, já qualificado(a) nos autos do processo ${o.numero?`nº <b>${e(o.numero)}</b>`:F("número do processo")}, em que litiga com <b>${e((o.contraria||"").toUpperCase())||F("parte contrária")}</b>, por seu(sua) advogado(a) que esta subscreve, vem, respeitosamente, à presença de Vossa Excelência, ${e(M.verbo)}</p>`;
+    c += `<h1>${e(M.acao)}</h1><div class="sub">pelos fatos e fundamentos a seguir</div>`;
+  } else {
   c += `<p class="ni">${qualiCli}, por seu(sua) advogado(a) que esta subscreve (procuração anexa), vem, respeitosamente, à presença de Vossa Excelência, ${e(M.verbo)}</p>`;
   c += `<h1>${e(M.acao)}</h1><div class="sub">${M.defesa?"":"em face de"}</div>`;
   if(!M.defesa) c += `<p class="ni">${contra}, pelos fatos e fundamentos a seguir expostos.</p>`;
   else c += `<p class="ni">nos autos da ação penal movida pelo <b>MINISTÉRIO PÚBLICO</b>, pelos fatos e fundamentos a seguir expostos.</p>`;
+  }
   c += `<table class="partes"><tr><td><span class="r">${e(M.autor)}</span>${e(o.cliente?.nome||"")||F("cliente")}</td><td><span class="r">${e(M.reu)}</span>${M.defesa?"Ministério Público":(e(o.contraria||"")||F("parte contrária"))}</td></tr></table>`;
   c += `<div class="box"><b class="t">Resumo do caso</b>${e(o.resumo||"") || F("em duas ou três linhas, o que aconteceu e o que se pede")}</div>`;
-  c += `<h2>I. Dos fatos</h2>${paragrafos(o.fatos) || `<p>${F("narre os fatos em ordem, com datas e documentos")}</p>`}`;
+  c += `<h2>I. ${M.intermediaria ? "Síntese" : "Dos fatos"}</h2>${paragrafos(o.fatos) || `<p>${F(M.intermediaria ? "resuma o processo e o ponto que esta peça responde" : "narre os fatos em ordem, com datas e documentos")}</p>`}`;
   if(crono.length) c += `<h3>Linha do tempo</h3><table class="crono">${crono.map(([d,t])=>`<tr><td class="dt">${e(d||"—")}</td><td>${e(t)}</td></tr>`).join("")}</table>`;
   if(o.citacao) c += `<div class="destaque">“${e(o.citacao)}”</div>`;
   c += `<h2>II. Do direito</h2>`;
@@ -183,7 +231,7 @@ P.montarPeca = function(o){
   c += `<h2>III. Dos pedidos</h2><p class="ni">Diante do exposto, requer:</p><ol class="ped" type="a">${pedidos.concat(M.pedidosFixos||[]).map(p=>`<li>${e(p.charAt(0).toLowerCase()+p.slice(1))};</li>`).join("")}</ol>`;
   if(M.liquidos && (o.valores||[]).length) c += `<table class="tab"><tr><th>Pedido</th><th style="width:140px">Valor estimado</th></tr>${o.valores.map(([p,v])=>`<tr><td>${e(p)}</td><td>${e(v)||F("R$")}</td></tr>`).join("")}</table>`;
   if(M.defesa && teses.some(t=>t.id==="p_testemunhas")) c += `<h3>Rol de testemunhas</h3><p class="ni">${o.testemunhas?e(o.testemunhas).replace(/\n/g,"<br>"):F("nome, qualificação e endereço de cada testemunha")}</p>`;
-  if(!M.defesa) c += `<p class="ni">Dá-se à causa o valor de <b>${o.valorCausa?e(o.valorCausa):F("R$ valor da causa")}</b>.</p>`;
+  if(!M.defesa && !M.intermediaria) c += `<p class="ni">Dá-se à causa o valor de <b>${o.valorCausa?e(o.valorCausa):F("R$ valor da causa")}</b>.</p>`;
   c += `<p class="ni">Termos em que pede deferimento.</p><p class="local">${e(cidade||"")||F("cidade")}, ${hojeExtenso()}.</p><div class="ass"><div class="l">${adv}</div></div>`;
   return P.docVisual({docs:o.docs, escritorio:o.escritorio, titulo:M.nome, corpo:c});
 };

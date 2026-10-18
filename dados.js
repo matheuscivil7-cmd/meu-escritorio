@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 const P = window.Pauta;
-const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos"];
+const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos","financeiro","atendimentos"];
 P.TABELAS = TABELAS;
 const agora = () => new Date().toISOString();
 const base = () => location.origin + location.pathname;
@@ -31,6 +31,7 @@ function edicao(d){
 
 /* ================= Supabase ================= */
 P.criarSupabase = function(url, chave){
+  const sbUrl = url;
   const sb = window.supabase.createClient(url, chave, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}});
   const ok = r => { if(r.error) throw r.error; return r.data; };
   let perfilAtual = null, canal = null;
@@ -53,7 +54,7 @@ P.criarSupabase = function(url, chave){
       if(!p) return {perfil:null, escritorio:null, motivo:"sem_perfil"};
       const e = ok(await sb.from("escritorios").select("*").eq("id", p.escritorio_id).maybeSingle());
       perfilAtual = p; api.eu.nome = p.nome;
-      return {perfil:p, escritorio: e ? {id:e.id, nome:e.nome, config:e.config||{}} : null};
+      return {perfil:p, escritorio: e ? {id:e.id, nome:e.nome, codigo:e.codigo, config:e.config||{}} : null};
     },
     async carregar(t){ return ok(await sb.from(t).select("*").limit(5000)) || []; },
     async inserir(t, row){ const r = Object.assign({}, row); delete r.id; if(t!=="perfis" && !r.escritorio_id) r.escritorio_id = perfilAtual.escritorio_id; return ok(await sb.from(t).insert(r).select().single()); },
@@ -72,7 +73,12 @@ P.criarSupabase = function(url, chave){
     async convites(){ return ok(await sb.from("convites").select("*").order("criado_em", {ascending:false})) || []; },
     async daily(){ const {data, error} = await sb.functions.invoke("noticias", {body:{}}); if(error) throw error; return data && data.itens ? [edicao(data)] : []; },
     async radar(tema){ const url = "https://news.google.com/rss/search?q=" + encodeURIComponent(tema) + "+when:7d&hl=pt-BR&gl=BR&ceid=BR:pt-419"; const {data, error} = await sb.functions.invoke("noticias", {body:{fontes:[{fonte:"Radar", area:"tribunais", url}]}}); if(error) throw error; return ((data && data.itens) || []).slice(0, 8).map(i=>({titulo:i.titulo, link:i.link, fonte:i.fonte, data:i.data})); },
-    async prefs(){ return null; }, async salvarPrefs(){}
+    async prefs(){ return null; }, async salvarPrefs(){},
+    async servico(acao, dados){ const {data, error} = await sb.functions.invoke("servicos", {body:Object.assign({acao}, dados||{})}); if(error) throw error; return data; },
+    async rpc(nome, args){ return ok(await sb.rpc(nome, args||{})); },
+    async enviarArquivo(caminho, arquivo){ ok(await sb.storage.from("documentos").upload(caminho, arquivo, {upsert:false, contentType:arquivo.type||"application/octet-stream"})); return caminho; },
+    async urlArquivo(caminho){ const r = ok(await sb.storage.from("documentos").createSignedUrl(caminho, 600)); return r.signedUrl; },
+    agendaUrl(token){ return (sbUrl||"") + "/functions/v1/agenda?t=" + token; }
   };
   return api;
 };
@@ -84,7 +90,7 @@ P.criarDemo = function(){
   const C = {joao:"c-joao", pad:"c-pad", marcos:"c-marcos"};
   const PR = {p1:"p-1", p2:"p-2", p3:"p-3", p4:"p-4"};
   const db = {
-    esc:{id:"escritorio", nome:"Lima & Reis Advocacia", config:{margem:2}},
+    esc:{id:"escritorio", nome:"Lima & Reis Advocacia", codigo:"DEMO01", config:{margem:2}},
     perfis:[
       {id:U.gestor, nome:"Ana Lima", email:"ana@limareis.adv.br", papel:"gestor", status:"ativo", permissoes:P.PADRAO.gestor},
       {id:U.adv, nome:"Paulo Reis", email:"paulo@limareis.adv.br", papel:"advogado", status:"ativo", permissoes:P.PADRAO.advogado},
@@ -115,7 +121,7 @@ P.criarDemo = function(){
       {id:"d1", processo_id:PR.p1, nome:"Procuração", status:"Assinado", data:d(-90), visivel_cliente:true},
       {id:"d3", processo_id:PR.p2, nome:"Notas fiscais e fotos da mercadoria", status:"Aguardando cliente", data:d(-5), visivel_cliente:true}
     ],
-    tarefas:[], revisoes:[], comunicacoes:[], modelos:[{id:"md1", tipo:"tema", area:"", titulo:"dano moral atraso de voo", texto:""}]
+    tarefas:[], revisoes:[], comunicacoes:[], modelos:[{id:"md1", tipo:"tema", area:"", titulo:"dano moral atraso de voo", texto:""}], financeiro:[], atendimentos:[{id:"at1", nome:"Carla Mendes", telefone:"(11) 95555-0101", email:"carla@email.com", area:"civel", relato:"Comprei um celular que parou de funcionar em 10 dias e a loja não quer trocar.", status:"novo", criado_em:new Date().toISOString()}]
   };
   const r1 = P.calcPrazo({inicio:d(-6), dias:15, contagem:"uteis", djen:false, suspende:true});
   db.tarefas = [
@@ -147,25 +153,40 @@ P.criarDemo = function(){
     async excluir(t, k){ db[t] = db[t].filter(x=>x.id!==k); if(t==="processos") ["tarefas","andamentos","documentos"].forEach(c=>db[c] = db[c].filter(x=>x.processo_id!==k)); avisar(t); },
     ouvir(cb){ cbs = [cb]; },
     async atualizarEscritorio(_, patch){ Object.assign(db.esc, patch); avisar("escritorios"); return Object.assign({}, db.esc); },
-    async portal(){ const p = db.perfis.find(x=>x.id===me); if(!p || !p.cliente_id) return {vinculado:false, escritorio:db.esc.nome}; const c = db.clientes.find(x=>x.id===p.cliente_id); return P.montarPortal({escritorio:db.esc, cliente:Object.assign({}, c, {portal_perm:p.permissoes}), processos:db.processos, andamentos:db.andamentos, documentos:db.documentos, tarefas:db.tarefas}); },
+    async portal(){ const p = db.perfis.find(x=>x.id===me); if(!p || !p.cliente_id) return {vinculado:false, escritorio:db.esc.nome}; const c = db.clientes.find(x=>x.id===p.cliente_id); return P.montarPortal({escritorio:db.esc, cliente:Object.assign({}, c, {portal_perm:p.permissoes}), processos:db.processos, andamentos:db.andamentos, documentos:db.documentos, tarefas:db.tarefas, perfis:db.perfis}); },
     async salvarPortal(){}, async removerPortal(){}, async pedidos(){ return []; },
     async convites(){ return db.convites.slice(); },
     async radar(tema){ return [{titulo:`Exemplo: tribunal julga caso sobre ${tema}`, link:"https://www.jusbrasil.com.br/jurisprudencia/busca?q="+encodeURIComponent(tema), fonte:"Demonstração", data:agora()}]; },
     async daily(){ return [{id:P.hoje(), geradoEm:agora(), demo:true, itens:[
       {titulo:"Exemplo: tribunal fixa tese sobre tema trabalhista", resumo:"Com o Supabase configurado, esta coluna traz as manchetes do STJ, Consultor Jurídico, Migalhas e notícias por área.", fonte:"Demonstração", link:"", area:"trabalhista", areas:["trabalhista"]},
       {titulo:"Exemplo: decisão sobre direito do consumidor", resumo:"Cada notícia mostra a fonte e abre a matéria original.", fonte:"Demonstração", link:"", area:"civel", areas:["civel"]}]}]; },
-    async prefs(){ return null; }, async salvarPrefs(){}
+    async prefs(){ return null; }, async salvarPrefs(){},
+    async servico(acao, d){
+      if(acao==="datajud") return {tribunal:"TRT2", encontrado:true, classe:"Ação Trabalhista - Rito Ordinário", orgao:"4ª Vara do Trabalho de Osasco", assuntos:["Horas Extras"], movimentos:[{data:new Date().toISOString(), nome:"Juntada de Petição", detalhe:"Manifestação"},{data:P.addDays(new Date(),-9).toISOString(), nome:"Audiência designada", detalhe:"instrução"},{data:P.addDays(new Date(),-40).toISOString(), nome:"Distribuído por sorteio", detalhe:""}]};
+      if(acao==="indices"){ const [di,mi,ai] = d.de.split("/").map(Number), [df,mf,af] = d.ate.split("/").map(Number); const v = []; let y = ai, m = mi; while(y<af || (y===af && m<=mf)){ v.push({data:`01/${String(m).padStart(2,"0")}/${y}`, valor: d.serie==="selic"?0.9:d.serie==="igpm"?0.3:0.4}); m++; if(m>12){ m=1; y++; } } return {serie:d.serie, valores:v}; }
+      return {};
+    },
+    async rpc(nome, a){
+      if(nome==="cliente_enviar_documento"){ const doc = db.documentos.find(x=>x.id===a.doc); if(doc){ doc.arquivo = a.caminho; doc.status = "Enviado pelo cliente"; avisar("documentos"); } return true; }
+      if(nome==="cliente_novo_documento"){ db.documentos.push({id:P.uid(), processo_id:a.pid, nome:a.p_nome||"Documento enviado", status:"Enviado pelo cliente", data:P.hoje(), visivel_cliente:true, arquivo:a.caminho}); avisar("documentos"); return true; }
+      if(nome==="escritorio_publico") return {nome:db.esc.nome};
+      if(nome==="novo_atendimento"){ db.atendimentos.push({id:P.uid(), nome:a.p_nome, telefone:a.p_telefone, email:a.p_email, area:a.p_area, relato:a.p_relato, status:"novo", criado_em:agora()}); avisar("atendimentos"); return true; }
+      return null;
+    },
+    async enviarArquivo(caminho){ return caminho; },
+    async urlArquivo(){ return "about:blank"; },
+    agendaUrl(token){ return location.origin + "/functions/v1/agenda?t=" + (token||"demo"); }
   };
   return api;
 };
 
 /* portal: usado pela demonstração */
-P.montarPortal = function({escritorio, cliente, processos, andamentos, documentos, tarefas}){
+P.montarPortal = function({escritorio, cliente, processos, andamentos, documentos, tarefas, perfis}){
   const perm = cliente.portal_perm || {ver_documentos:true, ver_audiencias:true};
-  return {vinculado:true, escritorio:escritorio?.nome||"", cliente:cliente.nome,
-    processos: processos.filter(p=>p.cliente_id===cliente.id).map(p=>({id:p.id, numero:p.numero||"", area:p.area, fase:p.fase||"", vara:p.vara||"", parte_contraria:p.parte_contraria||"", resumo:p.resumo_cliente||"", atualizado_em:p.atualizado_em||"",
+  return {vinculado:true, escritorio:escritorio?.nome||"", escritorio_id:escritorio?.id, contato:{telefone:"(11) 4000-1000", email:"contato@limareis.adv.br"}, cliente:cliente.nome,
+    processos: processos.filter(p=>p.cliente_id===cliente.id).map(p=>({id:p.id, numero:p.numero||"", area:p.area, fase:p.fase||"", vara:p.vara||"", parte_contraria:p.parte_contraria||"", resumo:p.resumo_cliente||"", atualizado_em:p.atualizado_em||"", advogado:(()=>{ const a = (perfis||[]).find(u=>u.id===p.responsavel_id); return a ? {nome:a.nome, email:a.email, telefone:a.telefone||"(11) 98888-1234"} : null; })(),
       andamentos: andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(a=>({data:a.data, texto:a.texto})),
-      documentos: perm.ver_documentos===false ? [] : documentos.filter(x=>x.processo_id===p.id && x.visivel_cliente).map(x=>({nome:x.nome, status:x.status, data:x.data})),
+      documentos: perm.ver_documentos===false ? [] : documentos.filter(x=>x.processo_id===p.id && x.visivel_cliente).map(x=>({id:x.id, nome:x.nome, status:x.status, data:x.data, arquivo:!!x.arquivo})),
       audiencias: perm.ver_audiencias===false ? [] : tarefas.filter(t=>t.processo_id===p.id && t.tipo==="Audiência" && !t.done && t.data>=P.hoje()).map(t=>({data:t.data, hora:t.hora||"", titulo:t.titulo||"", local:t.local||"", modalidade:t.modalidade||""}))}))};
 };
 })();
