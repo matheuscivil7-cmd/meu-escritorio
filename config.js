@@ -1,0 +1,4 @@
+window.PAUTA_CONFIG = {
+  supabaseUrl: "https://jxffvelotdfukdwhmdpf.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4ZmZ2ZWxvdGRmdWtkd2htZHBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMzAxNjksImV4cCI6MjEwNzkwNjE2OX0.qmhMf0TFqCBpR8svjMXTgzCrlW92QihZQR_xBogPQmc"
+};
