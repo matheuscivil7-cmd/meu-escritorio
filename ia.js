@@ -76,7 +76,7 @@ P.iaParaCliente = async function(texto, onText){
 P.FUNDOS = {
   preto:{nome:"Preto", escuro:true, t:{bg:"#09090a",surface:"#121213","surface-2":"#18181a","surface-3":"#212124",ink:"#f3eee3",muted:"#a39b8b",line:"#252528","line-strong":"#36363b",rail:"#050505"}},
   grafite:{nome:"Grafite", escuro:true, t:{bg:"#15171b",surface:"#1c1f24","surface-2":"#22262c","surface-3":"#2b2f36",ink:"#eef0f3",muted:"#9ca3ae",line:"#2d3139","line-strong":"#3b414b",rail:"#0e1013"}},
-  marinho:{nome:"Marinho", escuro:true, t:{bg:"#0a1020",surface:"#101a2e","surface-2":"#152139","surface-3":"#1c2a47",ink:"#edf1fa",muted:"#93a0bd",line:"#22304d","line-strong":"#304066",rail:"#060b17"}},
+  marinho:{nome:"Azul marinho", escuro:true, t:{bg:"#0b1730",surface:"#11203f","surface-2":"#16284c","surface-3":"#1d3159",ink:"#eef2fb",muted:"#9caac8",line:"#21365f","line-strong":"#2e4776",rail:"#071027"}},
   claro:{nome:"Claro", escuro:false, t:{bg:"#f4f2ed",surface:"#ffffff","surface-2":"#f8f6f1","surface-3":"#ece8df",ink:"#17150f",muted:"#686253",line:"#e3ded2","line-strong":"#cdc5b4",rail:"#14120d",
     danger:"#c0362a","danger-soft":"#fbe7e4",warn:"#a35a06","warn-soft":"#fbefd9",ok:"#1d7a4d","ok-soft":"#e0f2e8",trab:"#b4581b","trab-soft":"#fbeadf",civ:"#2f4fb8","civ-soft":"#e5eafb",crim:"#a32d6e","crim-soft":"#f8e4ef"}}
 };
@@ -94,11 +94,11 @@ P.ESTILOS = {
   classico:{nome:"Clássico", display:'"Cormorant Garamond", Georgia, "Times New Roman", serif', body:'"Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'},
   tecnico:{nome:"Técnico", display:'"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif', body:'"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'}
 };
-P.TEMA_PADRAO = {fundo:"preto", destaque:"dourado", estilo:"moderno", cantos:"arredondados", densidade:"confortavel"};
+P.TEMA_PADRAO = {fundo:"marinho", destaque:"dourado", estilo:"moderno", cantos:"arredondados", densidade:"confortavel"};
 P.tema = Object.assign({}, P.TEMA_PADRAO);
 P.aplicarTema = function(t){
   P.tema = Object.assign({}, P.TEMA_PADRAO, t||{});
-  const r = document.documentElement, f = P.FUNDOS[P.tema.fundo] || P.FUNDOS.preto, a = P.DESTAQUES[P.tema.destaque] || P.DESTAQUES.dourado, e = P.ESTILOS[P.tema.estilo] || P.ESTILOS.moderno;
+  const r = document.documentElement, f = P.FUNDOS[P.tema.fundo] || P.FUNDOS.marinho, a = P.DESTAQUES[P.tema.destaque] || P.DESTAQUES.dourado, e = P.ESTILOS[P.tema.estilo] || P.ESTILOS.moderno;
   ["danger","danger-soft","warn","warn-soft","ok","ok-soft","trab","trab-soft","civ","civ-soft","crim","crim-soft"].forEach(k=>r.style.removeProperty("--"+k));
   Object.entries(f.t).forEach(([k,v])=>r.style.setProperty("--"+k, v));
   r.style.setProperty("--gold", f.escuro ? a.c : a.deep);
@@ -110,7 +110,7 @@ P.aplicarTema = function(t){
   r.dataset.fundo = f.escuro ? "escuro" : "claro"; r.dataset.cantos = P.tema.cantos; r.dataset.densidade = P.tema.densidade; r.dataset.estilo = P.tema.estilo;
   const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.content = f.t.bg;
 };
-P.carregarTemaLocal = function(){ try{ const s = localStorage.getItem("pauta-tema"); return s ? JSON.parse(s) : null; }catch(e){ return null; } };
-P.salvarTemaLocal = function(t){ try{ localStorage.setItem("pauta-tema", JSON.stringify(t)); }catch(e){} };
+P.carregarTemaLocal = function(){ try{ const s = localStorage.getItem("me-tema"); return s ? JSON.parse(s) : null; }catch(e){ return null; } };
+P.salvarTemaLocal = function(t){ try{ localStorage.setItem("me-tema", JSON.stringify(t)); }catch(e){} };
 P.aplicarTema(P.carregarTemaLocal());
 })();

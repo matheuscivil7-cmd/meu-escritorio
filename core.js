@@ -270,17 +270,22 @@ P.pdfDisponivel = () => !!(window.jspdf && window.jspdf.jsPDF);
 P.pdfNovo = function(titulo, subtitulo){
   const doc = new window.jspdf.jsPDF({unit:"pt", format:"a4"});
   const W = doc.internal.pageSize.getWidth();
-  doc.setFillColor(10,10,11); doc.rect(0,0,W,84,"F");
-  doc.setFillColor(207,168,86); doc.rect(0,84,W,3,"F");
-  doc.setTextColor(207,168,86); doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.text(limpaPdf(titulo), 40, 42);
-  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(220,214,200);
-  if(subtitulo) doc.text(limpaPdf(subtitulo), 40, 62);
-  doc.setTextColor(207,168,86); doc.setFontSize(10); doc.text(limpaPdf((P.escritorio && P.escritorio.nome) || ""), W-40, 42, {align:"right"});
+  const dc = ((P.escritorio && P.escritorio.config) || {}).docs || {};
+  const rgb = (h, pad) => { const m = /^#?([0-9a-f]{6})$/i.exec(h||""); const x = m ? m[1] : pad; return [0,2,4].map(i=>parseInt(x.slice(i,i+2),16)); };
+  const C1 = rgb(dc.cor, "0f2747"), C2 = rgb(dc.cor2, "c5a253");
+  doc.setFillColor(...C1); doc.rect(0,0,W,84,"F");
+  doc.setFillColor(...C2); doc.rect(0,84,W,3,"F");
+  let xt = 40;
+  if(dc.logo && /^data:image\/(png|jpe?g)/.test(dc.logo)){ try{ doc.setFillColor(255,255,255); doc.roundedRect(40,18,96,48,6,6,"F"); const pr = doc.getImageProperties(dc.logo), k = Math.min(88/pr.width, 40/pr.height), lw = pr.width*k, lh = pr.height*k; doc.addImage(dc.logo, /png/.test(dc.logo)?"PNG":"JPEG", 44+(88-lw)/2, 22+(40-lh)/2, lw, lh, undefined, "FAST"); xt = 150; }catch(e){} }
+  doc.setTextColor(...C2); doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.text(limpaPdf(titulo), xt, 42);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(225,230,240);
+  if(subtitulo) doc.text(limpaPdf(subtitulo), xt, 62);
+  doc.setTextColor(...C2); doc.setFontSize(10); doc.text(limpaPdf((P.escritorio && P.escritorio.nome) || ""), W-40, 42, {align:"right"});
   doc.setTextColor(160,154,140); doc.text("Emitido em "+new Date().toLocaleDateString("pt-BR")+" às "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}), W-40, 62, {align:"right"});
   return {doc, y:116, W, M:40};
 };
 P.pdfQuebra = (ctx, h) => { const H = ctx.doc.internal.pageSize.getHeight(); if(ctx.y + h > H - 50){ ctx.doc.addPage(); ctx.y = 50; } };
-P.pdfTitulo = function(ctx, txt){ P.pdfQuebra(ctx, 40); const d = ctx.doc; d.setFont("helvetica","bold"); d.setFontSize(12); d.setTextColor(25,25,25); d.text(limpaPdf(txt), ctx.M, ctx.y); d.setDrawColor(207,168,86); d.setLineWidth(1); d.line(ctx.M, ctx.y+6, ctx.M+40, ctx.y+6); ctx.y += 22; };
+P.pdfTitulo = function(ctx, txt){ P.pdfQuebra(ctx, 40); const d = ctx.doc; d.setFont("helvetica","bold"); d.setFontSize(12); d.setTextColor(25,25,25); d.text(limpaPdf(txt), ctx.M, ctx.y); d.setDrawColor(197,162,83); d.setLineWidth(1); d.line(ctx.M, ctx.y+6, ctx.M+40, ctx.y+6); ctx.y += 22; };
 P.pdfTexto = function(ctx, txt, opt={}){
   const d = ctx.doc; d.setFont("helvetica", opt.bold?"bold":"normal"); d.setFontSize(opt.size||10); d.setTextColor(...(opt.cor||[40,40,40]));
   const linhas = d.splitTextToSize(limpaPdf(txt), ctx.W - ctx.M*2);
@@ -303,7 +308,7 @@ P.pdfTabela = function(ctx, head, body, opt={}){
 };
 P.pdfSalvar = function(ctx, nome){
   const d = ctx.doc, n = d.internal.getNumberOfPages(), H = d.internal.pageSize.getHeight();
-  for(let i=1;i<=n;i++){ d.setPage(i); d.setFontSize(8); d.setTextColor(150,150,150); d.text("Pauta Jurídica · página "+i+" de "+n, ctx.W/2, H-24, {align:"center"}); }
+  for(let i=1;i<=n;i++){ d.setPage(i); d.setFontSize(8); d.setTextColor(150,150,150); d.text("Meu Escritório · página "+i+" de "+n, ctx.W/2, H-24, {align:"center"}); }
   P.baixar(nome, d.output("blob"));
 };
 let _dl;

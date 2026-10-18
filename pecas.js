@@ -1,4 +1,4 @@
-/* Pauta Jurídica · peças, contratos, procurações e checklists (sem IA, tudo no navegador)
+/* Meu Escritório · peças, contratos, procurações e checklists (sem IA, tudo no navegador)
    Os textos são modelos de partida: o advogado revisa, ajusta e assina. */
 (function(P){
 "use strict";
@@ -152,15 +152,22 @@ P.advogadosDoc = function(cfgDocs){
   return String((cfgDocs||{}).advogados||"").split(/\n+/).map(l=>l.trim()).filter(Boolean);
 };
 
+P.DOC_COR = "#0f2747"; P.DOC_OURO = "#c5a253";
 /* ---------------- DOCUMENTO VISUAL LAW (HTML para imprimir/PDF e Word) ---------------- */
 P.docVisual = function(o){
-  const d = o.docs || {}, cor = /^#[0-9a-f]{6}$/i.test(d.cor||"") ? d.cor : "#1f3a2e", ouro = /^#[0-9a-f]{6}$/i.test(d.cor2||"") ? d.cor2 : "#b8924a";
-  const cab = `<table class="topo" width="100%"><tr><td>${d.logo?`<img src="${d.logo}" alt="" style="max-height:54px;max-width:220px">`:`<span class="marca">${e(d.nome||o.escritorio||"")}</span>`}</td><td align="right" class="topo-d">${e(d.nome||o.escritorio||"")}${d.oab?`<br>${e(d.oab)}`:""}</td></tr></table><div class="faixa"></div>`;
-  const rod = `<div class="rodape">${[d.endereco, d.telefone, d.email].filter(Boolean).map(e).join(" · ")}</div>`;
+  const d = o.docs || {}, cor = /^#[0-9a-f]{6}$/i.test(d.cor||"") ? d.cor : P.DOC_COR, ouro = /^#[0-9a-f]{6}$/i.test(d.cor2||"") ? d.cor2 : P.DOC_OURO;
+  const FONTES = {serif:'Georgia,"Times New Roman",serif', sans:'Arial,Helvetica,sans-serif', garamond:'Garamond,"EB Garamond","Times New Roman",serif', calibri:'Calibri,Carlito,Arial,sans-serif'};
+  const fonte = FONTES[d.fonte] || FONTES.serif, tam = ({"11":"11pt","12":"12pt","13":"13pt"})[d.tamanho] || "12pt";
+  const nomeEsc = e(d.nome||o.escritorio||""), marca = d.logo?`<img src="${d.logo}" alt="" style="max-height:${d.logoAltura==="grande"?76:d.logoAltura==="pequena"?40:54}px;max-width:240px">`:`<span class="marca">${nomeEsc}</span>`;
+  const cab = d.cabecalho==="centro"
+    ? `<div style="text-align:center">${marca}${d.logo?`<div class="topo-d" style="margin-top:4px">${nomeEsc}${d.oab?` · ${e(d.oab)}`:""}</div>`:d.oab?`<div class="topo-d">${e(d.oab)}</div>`:""}</div><div class="faixa"></div>`
+    : d.cabecalho==="nenhum" ? ""
+    : `<table class="topo" width="100%"><tr><td>${marca}</td><td align="right" class="topo-d">${nomeEsc}${d.oab?`<br>${e(d.oab)}`:""}</td></tr></table><div class="faixa"></div>`;
+  const rod = `<div class="rodape">${d.rodape ? e(d.rodape) : [d.endereco, d.telefone, d.email].filter(Boolean).map(e).join(" · ")}</div>`;
   return `<!DOCTYPE html><html lang="pt-BR" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${e(o.titulo||"Documento")}</title>
 <style>
 @page{size:A4;margin:22mm 20mm 20mm 22mm}
-body{font-family:Georgia,"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#1d1d1b;margin:0;padding:24px;background:#fff}
+body{font-family:${fonte};font-size:${tam};line-height:${d.entrelinha==="1.15"?"1.35":d.entrelinha==="2"?"2":"1.6"};color:#1d1d1b;margin:0;padding:24px;background:#fff}
 .doc{max-width:760px;margin:0 auto}
 .topo td{vertical-align:middle;border:0;padding:0}.marca{font-family:Arial,sans-serif;font-weight:bold;font-size:15pt;color:${cor};letter-spacing:.04em}
 .topo-d{font-family:Arial,sans-serif;font-size:8.5pt;color:#6b6b66}
@@ -176,7 +183,7 @@ h3{font-family:Arial,sans-serif;font-size:11pt;color:${cor};margin:18px 0 8px;bo
 .box b.t{display:block;font-family:Arial,sans-serif;font-size:8.5pt;letter-spacing:.12em;text-transform:uppercase;color:${ouro};margin-bottom:4px}
 .partes{width:100%;border-collapse:collapse;margin:8px 0 16px}.partes td{width:50%;vertical-align:top;border:1px solid #d9d2c3;padding:10px 12px;font-size:10.5pt;line-height:1.45}
 .partes .r{font-family:Arial,sans-serif;font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:${ouro};display:block;margin-bottom:4px}
-.fund{font-family:Arial,sans-serif;font-size:8.5pt;color:${cor};background:#eef2ef;border-left:3px solid ${cor};padding:5px 10px;margin:-4px 0 14px}
+.fund{font-family:Arial,sans-serif;font-size:8.5pt;color:${cor};background:#eef2f8;border-left:3px solid ${cor};padding:5px 10px;margin:-4px 0 14px}
 .crono{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:10.5pt}.crono td{border-bottom:1px solid #e3ddcf;padding:6px 8px;vertical-align:top}
 .crono td.dt{width:110px;font-family:Arial,sans-serif;font-weight:bold;color:#fff;background:${cor};text-align:center;white-space:nowrap}
 .ped{margin:0 0 14px;padding-left:22px}.ped li{margin:0 0 6px;text-align:justify}
@@ -288,4 +295,114 @@ P.mensagemDocs = function(nome, faltam, escritorio){
   const pn = String(nome||"").trim().split(/\s+/)[0] || "";
   return `Olá${pn?", "+pn:""}! Para darmos andamento ao seu caso, faltam só estes documentos:\n\n${faltam.map((x,i)=>`${i+1}. ${x}`).join("\n")}\n\nPode mandar por aqui mesmo, em foto ou PDF. Qualquer dúvida, estamos à disposição.${escritorio?"\n\n"+escritorio:""}`;
 };
+
+/* ---------------- MODELOS PRÓPRIOS EM WORD (.docx) ----------------
+   O escritório envia o próprio contrato/procuração/petição em Word com campos {{CAMPO}}.
+   O app troca só os campos e devolve o mesmo arquivo: margens, fontes, cabeçalho, rodapé e logo ficam iguais. */
+P.TIPOS_MODELO = [["contrato","Contrato de honorários"],["procuracao","Procuração"],["peticao","Petição / peça"],["declaracao","Declaração"],["notificacao","Notificação / carta"],["outro","Outro documento"]];
+P.CAMPOS_MODELO = [
+  ["Cliente", [["CLIENTE_NOME","Nome do cliente"],["CLIENTE_QUALIFICACAO","Qualificação completa (nome, nacionalidade, estado civil, profissão, RG, CPF e endereço)"],["CLIENTE_CPF_CNPJ","CPF ou CNPJ"],["CLIENTE_RG","RG"],["CLIENTE_NACIONALIDADE","Nacionalidade"],["CLIENTE_ESTADO_CIVIL","Estado civil"],["CLIENTE_PROFISSAO","Profissão"],["CLIENTE_ENDERECO","Endereço"],["CLIENTE_TELEFONE","Telefone"],["CLIENTE_EMAIL","E-mail"],["CLIENTE_REPRESENTANTE","Representante legal (empresa)"]]],
+  ["Processo", [["PROCESSO_NUMERO","Número do processo"],["PROCESSO_VARA","Vara / juízo"],["PROCESSO_AREA","Área"],["PARTE_CONTRARIA","Parte contrária"],["VALOR_CAUSA","Valor da causa"]]],
+  ["Escritório", [["ESCRITORIO_NOME","Nome do escritório"],["ESCRITORIO_CNPJ","CNPJ"],["ESCRITORIO_OAB","Registro na OAB"],["ESCRITORIO_ENDERECO","Endereço"],["ESCRITORIO_TELEFONE","Telefone"],["ESCRITORIO_EMAIL","E-mail"],["ADVOGADO_NOME","Advogado(a) principal"],["ADVOGADO_OAB","OAB do advogado(a)"],["ADVOGADOS","Todos os advogados"],["CIDADE","Cidade"]]],
+  ["Datas", [["DATA_HOJE","Data de hoje (dd/mm/aaaa)"],["DATA_EXTENSO","Data por extenso"]]],
+  ["Preencher na hora", [["OBJETO","Objeto do contrato / serviço"],["HONORARIOS_VALOR","Valor dos honorários"],["HONORARIOS_PARCELAS","Forma de pagamento / parcelas"],["HONORARIOS_PERCENTUAL","Percentual de êxito"]]]
+];
+P.ROTULO_CAMPO = k => { for(const [,l] of P.CAMPOS_MODELO){ const f = l.find(x=>x[0]===k); if(f) return f[1]; } return k.replace(/_/g," ").toLowerCase().replace(/^./, c=>c.toUpperCase()); };
+const chaveCampo = t => String(t||"").normalize("NFD").replace(/[̀-ͯ]/g,"").trim().toUpperCase().replace(/[^A-Z0-9]+/g,"_").replace(/^_|_$/g,"");
+const RE_CAMPO = /\{\{\s*([^{}]{1,60}?)\s*\}\}/g;
+const WNS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const partesDocx = zip => Object.keys(zip.files).filter(n=>/^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(n));
+function paragrafosXml(doc){
+  return [...doc.getElementsByTagNameNS(WNS,"p")].map(p=>({p, ts:[...p.getElementsByTagNameNS(WNS,"t")].filter(t=>{ let a = t.parentNode; while(a && !(a.namespaceURI===WNS && a.localName==="p")) a = a.parentNode; return a===p; })}));
+}
+P.lerCamposDocx = async function(buf){
+  if(!window.JSZip) throw new Error("Leitor de Word indisponível. Recarregue a página.");
+  let zip; try{ zip = await JSZip.loadAsync(buf); }catch(e){ throw new Error("O arquivo não parece um Word (.docx). Se for .doc antigo, abra no Word e salve como .docx."); }
+  if(!zip.file("word/document.xml")) throw new Error("O arquivo não parece um Word (.docx). Se for .doc antigo, abra no Word e salve como .docx.");
+  const campos = new Set(); let texto = "";
+  for(const n of partesDocx(zip)){
+    const doc = new DOMParser().parseFromString(await zip.file(n).async("string"), "application/xml");
+    for(const {ts} of paragrafosXml(doc)){ const full = ts.map(t=>t.textContent).join(""); if(n==="word/document.xml") texto += full + "\n"; let m; RE_CAMPO.lastIndex = 0; while((m = RE_CAMPO.exec(full))) campos.add(chaveCampo(m[1])); }
+  }
+  return {campos:[...campos].filter(Boolean), texto:texto.trim()};
+};
+P.preencherDocx = async function(buf, valores){
+  const zip = await JSZip.loadAsync(buf), ser = new XMLSerializer();
+  for(const n of partesDocx(zip)){
+    const xml = await zip.file(n).async("string"); if(!xml.includes("{{")) continue;
+    const doc = new DOMParser().parseFromString(xml, "application/xml");
+    for(const {ts} of paragrafosXml(doc)){
+      const full = ts.map(t=>t.textContent).join(""); if(!full.includes("{{")) continue;
+      const ms = []; let m; RE_CAMPO.lastIndex = 0; while((m = RE_CAMPO.exec(full))) ms.push([m.index, m.index + m[0].length, chaveCampo(m[1])]);
+      for(let k = ms.length-1; k>=0; k--){
+        const [ini, fim, chave] = ms[k]; let v = valores[chave]; v = (v===undefined || v===null || String(v).trim()==="") ? "__________" : String(v).replace(/\s*\n\s*/g," ");
+        let pos = 0, a = -1, oa = 0, b = -1, ob = 0;
+        ts.forEach((t,i)=>{ const L = t.textContent.length; if(a<0 && ini < pos+L){ a = i; oa = ini-pos; } if(b<0 && fim-1 < pos+L){ b = i; ob = fim-1-pos; } pos += L; });
+        if(a<0 || b<0) continue;
+        if(a===b){ const tx = ts[a].textContent; ts[a].textContent = tx.slice(0,oa) + v + tx.slice(ob+1); }
+        else { ts[a].textContent = ts[a].textContent.slice(0,oa) + v; for(let i=a+1;i<b;i++) ts[i].textContent = ""; ts[b].textContent = ts[b].textContent.slice(ob+1); }
+        [a,b].forEach(i=>ts[i].setAttribute("xml:space","preserve"));
+      }
+    }
+    zip.file(n, ser.serializeToString(doc));
+  }
+  return zip.generateAsync({type:"blob", mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+};
+const qualiTexto = c => { if(!c) return ""; const d = c.dados||{}, x = (v, r) => v || "___ ("+r+")";
+  return c.tipo==="PJ" ? `${(c.nome||"").toUpperCase()}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ${x(c.doc,"CNPJ")}, com sede em ${x(d.endereco,"endereço")}, neste ato representada por ${x(d.representante,"representante legal")}`
+    : `${(c.nome||"").toUpperCase()}, ${x(d.nacionalidade,"nacionalidade")}, ${x(d.estado_civil,"estado civil")}, ${x(d.profissao,"profissão")}, portador(a) do RG nº ${x(d.rg,"RG")}, inscrito(a) no CPF sob o nº ${x(c.doc,"CPF")}, residente e domiciliado(a) em ${x(d.endereco,"endereço")}`; };
+P.valoresModelo = function({cliente, processo, docs, escritorio, area}){
+  const c = cliente || {}, d = c.dados || {}, p = processo || {}, k = docs || {};
+  const advs = P.advogadosDoc(k), a1 = (advs[0]||"").split(",").map(x=>x.trim());
+  const hoje = new Date();
+  const moeda = v => v ? Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "";
+  return {
+    CLIENTE_NOME:c.nome||"", CLIENTE_QUALIFICACAO:cliente?qualiTexto(c):"", CLIENTE_CPF_CNPJ:c.doc||"", CLIENTE_RG:d.rg||"", CLIENTE_NACIONALIDADE:d.nacionalidade||"", CLIENTE_ESTADO_CIVIL:d.estado_civil||"", CLIENTE_PROFISSAO:d.profissao||"", CLIENTE_ENDERECO:d.endereco||"", CLIENTE_TELEFONE:c.telefone||"", CLIENTE_EMAIL:c.email||"", CLIENTE_REPRESENTANTE:d.representante||"",
+    PROCESSO_NUMERO:p.numero||"", PROCESSO_VARA:p.vara||"", PROCESSO_AREA:area||"", PARTE_CONTRARIA:p.parte_contraria||"", VALOR_CAUSA:moeda(p.valor),
+    ESCRITORIO_NOME:k.nome||escritorio||"", ESCRITORIO_CNPJ:k.cnpj||"", ESCRITORIO_OAB:k.oab||"", ESCRITORIO_ENDERECO:k.endereco||"", ESCRITORIO_TELEFONE:k.telefone||"", ESCRITORIO_EMAIL:k.email||"",
+    ADVOGADO_NOME:a1[0]||"", ADVOGADO_OAB:a1.find(x=>/oab/i.test(x))||"", ADVOGADOS:advs.join("; "), CIDADE:k.cidade||"",
+    DATA_HOJE:hoje.toLocaleDateString("pt-BR"), DATA_EXTENSO:hoje.toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"})
+  };
+};
+/* modelo de exemplo, gerado no navegador, já com os campos */
+P.docxExemplo = async function(docs){
+  const k = docs || {}, x = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const cor = (k.cor||P.DOC_COR).replace("#",""), ouro = (k.cor2||P.DOC_OURO).replace("#","");
+  const par = (t, o={}) => `<w:p><w:pPr>${o.c?'<w:jc w:val="center"/>':'<w:jc w:val="both"/>'}<w:spacing w:after="${o.after??160}" w:line="300" w:lineRule="auto"/>${o.ind?'<w:ind w:firstLine="709"/>':""}</w:pPr>${t.split(/(\{\{[^}]+\}\})/).filter(Boolean).map(seg=>`<w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/>${o.b?"<w:b/>":""}${o.cor?`<w:color w:val="${o.cor}"/>`:""}<w:sz w:val="${o.sz||23}"/></w:rPr><w:t xml:space="preserve">${x(seg)}</w:t></w:r>`).join("")}</w:p>`;
+  const corpo = [
+    par("CONTRATO DE PRESTAÇÃO DE SERVIÇOS ADVOCATÍCIOS",{c:1,b:1,cor,sz:28,after:80}),
+    par("{{ESCRITORIO_NOME}}",{c:1,cor:ouro,sz:18,after:360}),
+    par("CONTRATANTE: {{CLIENTE_QUALIFICACAO}}.",{ind:1}),
+    par("CONTRATADO: {{ESCRITORIO_NOME}}, inscrito no CNPJ sob o nº {{ESCRITORIO_CNPJ}}, registro {{ESCRITORIO_OAB}}, com sede em {{ESCRITORIO_ENDERECO}}, neste ato representado por {{ADVOGADO_NOME}}, {{ADVOGADO_OAB}}.",{ind:1}),
+    par("CLÁUSULA PRIMEIRA – DO OBJETO",{b:1,cor}),
+    par("O CONTRATADO prestará ao CONTRATANTE os serviços de {{OBJETO}}, referentes ao processo nº {{PROCESSO_NUMERO}}, em face de {{PARTE_CONTRARIA}}.",{ind:1}),
+    par("CLÁUSULA SEGUNDA – DOS HONORÁRIOS",{b:1,cor}),
+    par("Pelos serviços, o CONTRATANTE pagará {{HONORARIOS_VALOR}}, da seguinte forma: {{HONORARIOS_PARCELAS}}, além de {{HONORARIOS_PERCENTUAL}} sobre o proveito econômico obtido.",{ind:1}),
+    par("CLÁUSULA TERCEIRA – DO FORO",{b:1,cor}),
+    par("Fica eleito o foro da comarca de {{CIDADE}} para dirimir dúvidas oriundas deste contrato.",{ind:1}),
+    par("{{CIDADE}}, {{DATA_EXTENSO}}.",{after:720}),
+    par("_______________________________________",{c:1,after:0}), par("{{CLIENTE_NOME}}",{c:1,b:1,after:480}),
+    par("_______________________________________",{c:1,after:0}), par("{{ESCRITORIO_NOME}}",{c:1,b:1})
+  ].join("");
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>`);
+  zip.file("word/footer1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="${WNS}">${par("{{ESCRITORIO_NOME}} · {{ESCRITORIO_ENDERECO}} · {{ESCRITORIO_TELEFONE}}",{c:1,sz:16,cor:"808080",after:0})}</w:ftr>`);
+  zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${WNS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${corpo}<w:sectPr><w:footerReference w:type="default" r:id="rId1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1134" w:bottom="1134" w:left="1701" w:header="709" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`);
+  return zip.generateAsync({type:"blob", mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+};
+/* visualização fiel (docx-preview) e PDF pela impressão do navegador */
+P.carregarScript = src => new Promise((ok, erro)=>{ if(document.querySelector(`script[src="${src}"]`) && window.docx){ ok(); return; } const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = ()=>erro(new Error("Não consegui carregar o visualizador de Word. Verifique a internet.")); document.head.appendChild(s); });
+P.mostrarDocx = async function(blob, alvo){
+  await P.carregarScript("https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js");
+  alvo.innerHTML = "";
+  await window.docx.renderAsync(blob, alvo, alvo, {inWrapper:true, ignoreWidth:false, ignoreHeight:false, breakPages:true, renderHeaders:true, renderFooters:true, useBase64URL:true});
+};
+P.imprimirDocx = function(alvo, titulo){
+  const w = window.open("", "_blank"); if(!w) throw new Error("O navegador bloqueou a janela. Permita pop-ups para salvar em PDF.");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${String(titulo||"Documento").replace(/</g,"")}</title><style>@page{size:A4;margin:0}html,body{margin:0;background:#fff}.docx-wrapper{background:#fff!important;padding:0!important}.docx-wrapper>section.docx{box-shadow:none!important;margin:0 auto!important;page-break-after:always}</style></head><body>${alvo.innerHTML}<script>setTimeout(()=>{print()},500)<\/script></body></html>`);
+  w.document.close();
+};
+
 })(window.Pauta);

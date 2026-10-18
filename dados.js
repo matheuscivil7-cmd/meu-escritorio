@@ -78,6 +78,8 @@ P.criarSupabase = function(url, chave){
     async rpc(nome, args){ return ok(await sb.rpc(nome, args||{})); },
     async enviarArquivo(caminho, arquivo){ ok(await sb.storage.from("documentos").upload(caminho, arquivo, {upsert:false, contentType:arquivo.type||"application/octet-stream"})); return caminho; },
     async urlArquivo(caminho){ const r = ok(await sb.storage.from("documentos").createSignedUrl(caminho, 600)); return r.signedUrl; },
+    async baixarArquivo(caminho){ return ok(await sb.storage.from("documentos").download(caminho)); },
+    async apagarArquivo(caminho){ ok(await sb.storage.from("documentos").remove([caminho])); },
     agendaUrl(token){ return (sbUrl||"") + "/functions/v1/agenda?t=" + token; }
   };
   return api;
@@ -176,8 +178,10 @@ P.criarDemo = function(){
       if(nome==="novo_atendimento"){ db.atendimentos.push({id:P.uid(), nome:a.p_nome, telefone:a.p_telefone, email:a.p_email, area:a.p_area, relato:a.p_relato, status:"novo", criado_em:agora()}); avisar("atendimentos"); return true; }
       return null;
     },
-    async enviarArquivo(caminho){ return caminho; },
-    async urlArquivo(){ return "about:blank"; },
+    async enviarArquivo(caminho, arquivo){ (P._arqDemo = P._arqDemo || {})[caminho] = arquivo; return caminho; },
+    async urlArquivo(caminho){ const b = (P._arqDemo||{})[caminho]; return b ? URL.createObjectURL(b) : "about:blank"; },
+    async baixarArquivo(caminho){ const b = (P._arqDemo||{})[caminho]; if(!b) throw new Error("Arquivo não encontrado"); return b; },
+    async apagarArquivo(caminho){ delete (P._arqDemo||{})[caminho]; },
     agendaUrl(token){ return location.origin + "/functions/v1/agenda?t=" + (token||"demo"); }
   };
   return api;
@@ -188,8 +192,8 @@ P.montarPortal = function({escritorio, cliente, processos, andamentos, documento
   const perm = cliente.portal_perm || {ver_documentos:true, ver_audiencias:true};
   return {vinculado:true, escritorio:escritorio?.nome||"", escritorio_id:escritorio?.id, contato:{telefone:"(11) 4000-1000", email:"contato@limareis.adv.br"}, cliente:cliente.nome,
     processos: processos.filter(p=>p.cliente_id===cliente.id).map(p=>({id:p.id, numero:p.numero||"", area:p.area, fase:p.fase||"", vara:p.vara||"", parte_contraria:p.parte_contraria||"", resumo:p.resumo_cliente||"", atualizado_em:p.atualizado_em||"", advogado:(()=>{ const a = (perfis||[]).find(u=>u.id===p.responsavel_id); return a ? {nome:a.nome, email:a.email, telefone:a.telefone||"(11) 98888-1234"} : null; })(),
-      andamentos: andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(a=>({data:a.data, texto:a.texto})),
-      documentos: perm.ver_documentos===false ? [] : documentos.filter(x=>x.processo_id===p.id && x.visivel_cliente).map(x=>({id:x.id, nome:x.nome, status:x.status, data:x.data, arquivo:!!x.arquivo})),
+      andamentos: andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(a=>({data:a.data, texto:a.texto, arquivo:a.arquivo||null, arquivo_nome:a.arquivo_nome||null})),
+      documentos: perm.ver_documentos===false ? [] : documentos.filter(x=>x.processo_id===p.id && x.visivel_cliente).map(x=>({id:x.id, nome:x.nome, status:x.status, data:x.data, arquivo:!!x.arquivo, caminho:x.arquivo||null})),
       audiencias: perm.ver_audiencias===false ? [] : tarefas.filter(t=>t.processo_id===p.id && t.tipo==="Audiência" && !t.done && t.data>=P.hoje()).map(t=>({data:t.data, hora:t.hora||"", titulo:t.titulo||"", local:t.local||"", modalidade:t.modalidade||""}))}))};
 };
 })();

@@ -56,6 +56,7 @@ const L = {pane:"entrar", ferramenta:"", motivo:"", erro:"", carregando:true, en
 const CH = {msgs:[], input:"", ocupado:false, pend:{}};
 const DG = {area:"todas", termo:"", aberto:"", juris:""};
 let LOGO_TMP = null;
+ICON.config = ICON.ajustes;
 Object.assign(L, {tela:"entrar", token:"", convite:null, erroForm:"", msg:"", enviando:false, emailDigitado:""});
 S.convites = [];
 
@@ -95,7 +96,7 @@ async function identificar(){
   let r = {};
   try{ r = await api.meuPerfil(); }catch(e){ r = {motivo:"erro", erro:P.erroAmigavel(e)}; }
   S.escritorio = r.escritorio || null; P.escritorio = S.escritorio;
-  const temaEsc = S.escritorio && S.escritorio.config && S.escritorio.config.tema;
+  const temaEsc = S.escritorio && S.escritorio.config && S.escritorio.config.tema_v2;
   if(temaEsc && !P.carregarTemaLocal()) P.aplicarTema(temaEsc);
   const bloqueado = r.perfil && r.perfil.status!=="ativo";
   S.perfil = r.perfil && !bloqueado ? r.perfil : null;
@@ -191,7 +192,7 @@ function mostrarInicio(){
   const paneAtual = L.pane==="ferramenta" ? "ferramentas" : L.pane;
   const soLogin = !!(L.atend || L.portalMode || (L.convite && L.convite.papel==="cliente"));
   $("#root").innerHTML = `<div class="landing${soLogin?" so-login":""}" data-pane="${soLogin?"entrar":L.pane}">
-    <header class="land-top"><div class="brand"><div class="logo">§</div><div><b>Pauta</b><small>${esc(S.escritorio?.nome || "Jurídica")}</small></div></div>
+    <header class="land-top"><div class="brand"><div class="logo">§</div><div><b>Meu Escritório</b><small>${esc(S.escritorio?.nome || "Gestão jurídica")}</small></div></div>
       <div class="row">${S.perfil && !L.carregando ? `<button class="btn primary" data-act="entrar" ${L.entrando?"disabled":""}>${L.entrando?`<span class="spinner"></span>`:ehCliente()?"Meus processos":"Entrar"}</button>`:""}<button class="icon-btn" data-act="aparencia" aria-label="Aparência" title="Aparência">${ICON.paleta}</button></div></header>
     <aside class="land-tools"><h3>Use sem entrar</h3>
       ${FERRAMENTAS.map(([k,t,d,ic])=>`<button class="tool-btn" data-act="ferramenta" data-f="${k}" aria-current="${ativo===k}"><span class="ic">${ICON[ic]}</span><span><b>${t}</b><span>${d}</span></span></button>`).join("")}
@@ -352,11 +353,12 @@ function itensNav(){
   it.push(["daily","Daily jurídico"]);
   if(pode("gerar_relatorios")||pode("enviar_cliente")) it.push(["relatorios","Relatórios"]);
   if(pode("gerenciar_equipe")) it.push(["equipe","Equipe e acessos"]);
+  if(pode("gerenciar_equipe")) it.push(["config","Configurações"]);
   return it;
 }
 function montarShell(){
   $("#root").innerHTML = `<div class="app">
-    <aside class="rail"><div class="brand"><div class="logo">§</div><div><b>Pauta</b><small id="office-name"></small></div></div>
+    <aside class="rail"><div class="brand"><div class="logo">§</div><div><b>Meu Escritório</b><small id="office-name"></small></div></div>
       <nav class="navlist" id="nav" aria-label="Seções"></nav>
       <div class="rail-foot"><div class="me" data-act="perfil" role="button" tabindex="0"><span class="avatar" id="me-av"></span><div><b id="me-nome"></b><span id="me-papel"></span></div></div></div></aside>
     <main class="main"><div class="wrap" id="main"></div></main>
@@ -380,7 +382,7 @@ function render(dados){
   const ae = document.activeElement;
   const editando = dados && ae && $("#main").contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.id!=="busca";
   if((!dados || vivo) && !editando){
-    const fn = {inicio:vInicio, agenda:vAgenda, processos:vProcessos, clientes:vClientes, minutas:vMinutas, assistente:vAssistente, pecas:vPecas, financeiro:vFinanceiro, atendimentos:vAtendimentos, calculadoras:()=>vCalculadoras(""), painel:vPainel, direito:()=>vDireito(""), daily:vDaily, relatorios:vRelatorios, equipe:vEquipe, portal:vPortal}[view];
+    const fn = {inicio:vInicio, agenda:vAgenda, processos:vProcessos, clientes:vClientes, minutas:vMinutas, assistente:vAssistente, pecas:vPecas, financeiro:vFinanceiro, atendimentos:vAtendimentos, calculadoras:()=>vCalculadoras(""), painel:vPainel, direito:()=>vDireito(""), config:vConfig, daily:vDaily, relatorios:vRelatorios, equipe:vEquipe, portal:vPortal}[view];
     const main = $("#main");
     const foco = ae && ae.id==="busca" ? ae.selectionStart : null;
     main.innerHTML = (api.modo==="demo"?`<div class="banner">Demonstração fora do Claude: dados de exemplo, nada é salvo.</div>`:"") + fn();
@@ -550,14 +552,14 @@ function vClientes(){
   const q = busca.trim().toLowerCase();
   let cs = S.clientes.slice().sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
   if(q) cs = cs.filter(c=>[c.nome,c.doc,c.email,c.telefone].join(" ").toLowerCase().includes(q));
-  return `<div class="head"><div><h1>Clientes</h1><div class="sub">${S.clientes.length} cliente(s). Vincule a conta do cliente para ele acompanhar os processos pelo portal.</div></div>${pode("gerenciar_clientes")?`<button class="btn primary" data-act="novo-cliente">${ICON.plus}Novo cliente</button>`:""}</div>
+  return `<div class="head"><div><h1>Clientes</h1><div class="sub">${S.clientes.length} cliente(s). Ao cadastrar, o app já cria o link para o cliente acompanhar os processos pelo portal.</div></div>${pode("gerenciar_clientes")?`<button class="btn primary" data-act="novo-cliente">${ICON.plus}Novo cliente</button>`:""}</div>
   <div class="search">${ICON.search}<input type="search" id="busca" placeholder="Buscar cliente" value="${esc(busca)}" data-bind="busca"></div>
   <div class="panel">${!S.clientes.length?`<div class="empty"><h2>Nenhum cliente ainda</h2><p>Clientes também podem ser criados direto no cadastro do processo.</p></div>`:`
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Contato</th><th>Processos</th><th>Acesso ao portal</th></tr></thead><tbody>
-  ${cs.map(c=>{ const ps = S.processos.filter(p=>p.cliente_id===c.id); const acc = c.conta_id ? {status:"ativo"} : null;
+  ${cs.map(c=>{ const ps = S.processos.filter(p=>p.cliente_id===c.id); const ac = acessoCliente(c.id), [acl, ast] = CHIP_ACESSO[ac.estado], gere = pode("gerenciar_equipe");
     return `<tr data-act="editar-cliente" data-id="${c.id}"><td><b style="font-weight:600">${esc(c.nome)}</b><div class="small muted">${esc(c.tipo||"")} ${esc(c.doc||"")}</div></td><td class="small">${esc(c.telefone||"")}<div class="muted">${esc(c.email||"")}</div></td>
       <td><div class="row" style="gap:4px"><span class="mono">${ps.length}</span>${[...new Set(ps.map(p=>p.area))].map(chipArea).join("")}</div></td>
-      <td>${acc?`<span class="chip ok">Portal ativo</span>`:`<span class="chip neutral">Sem acesso</span>`}</td></tr>`;}).join("")}
+      <td><div class="row" style="gap:6px;flex-wrap:nowrap"><span class="chip ${acl}">${ast}</span>${gere && ac.estado!=="bloqueado"?`<button class="linkbtn small" data-act="ac-liberar" data-id="${c.id}">${ac.estado==="sem"?"Liberar":ac.estado==="enviado"?"Reenviar":"Enviar endereço"}</button>`:""}</div></td></tr>`;}).join("")}
   </tbody></table></div>`}</div>`;
 }
 
@@ -1031,11 +1033,11 @@ function pcProcesso(pid, aba){
   if(!P.MODELOS_PECA[PC.modelo] || P.MODELOS_PECA[PC.modelo].area!==p.area){ const k = Object.keys(P.MODELOS_PECA).find(k=>P.MODELOS_PECA[k].area===p.area); if(k){ PC.modelo = k; PC.teses = null; } }
 }
 function vPecas(){
-  const abas = [["inicial","Petição e peças"],["contrato","Contrato e procuração"],["checklist","Checklist de documentos"],["modelos","Teses e modelos"]];
-  const corpo = PC.aba==="contrato" ? pcContrato() : PC.aba==="checklist" ? pcChecklist() : PC.aba==="modelos" ? pcModelos() : pcInicial();
+  const abas = [["inicial","Petição e peças"],["contrato","Contrato e procuração"],["meus","Modelos do escritório"],["checklist","Checklist de documentos"],["modelos","Teses e modelos"]];
+  const corpo = PC.aba==="contrato" ? pcContrato() : PC.aba==="checklist" ? pcChecklist() : PC.aba==="modelos" ? pcModelos() : PC.aba==="meus" ? pcMeusModelos() : pcInicial();
   return `<div class="head"><div><h1>Peças e documentos</h1><div class="sub">Primeira versão de peças, contrato, procuração e checklist no modelo do escritório, com visual law. Você revisa, ajusta e assina.</div></div></div>
   <div class="tabs" role="tablist"><span class="ind"></span>${abas.map(([k,l])=>`<button role="tab" aria-selected="${PC.aba===k}" data-act="pc-aba" data-a="${k}">${l}</button>`).join("")}</div>
-  ${!docsCfg().nome && pode("gerenciar_equipe") ? `<div class="notice">Cadastre os dados do escritório (nome, CNPJ, endereço, advogados, logo e cores) em <button class="linkbtn" data-act="nav" data-v="equipe">Equipe e acessos › Ajustes</button> para eles saírem nos documentos.</div>` : ""}
+  ${!docsCfg().nome && pode("gerenciar_equipe") ? `<div class="notice">Cadastre os dados do escritório (nome, CNPJ, endereço, advogados, logo e cores) em <button class="linkbtn" data-act="nav" data-v="config">Configurações</button> para eles saírem nos documentos.</div>` : ""}
   ${corpo}`;
 }
 const camposFaltando = c => { if(!c) return ["cliente"]; const d = c.dados||{}; return (c.tipo==="PJ" ? [["doc","CNPJ"],["endereco","endereço"],["representante","representante legal"]] : [["doc","CPF"],["rg","RG"],["nacionalidade","nacionalidade"],["estado_civil","estado civil"],["profissao","profissão"],["endereco","endereço"]]).filter(([k])=>!(k==="doc"?c.doc:d[k])).map(([,l])=>l); };
@@ -1091,7 +1093,7 @@ function gerarPeca(){
 function pcContrato(){
   const advs = P.advogadosDoc(docsCfg());
   if(!PC.advs) PC.advs = advs.slice(0,1);
-  return `<div class="pc-grid">
+  return `${blocoMeusModelos(["contrato","procuracao"], PC.cliente_id)}<div class="pc-grid">
   <div class="panel"><div class="panel-b pc-form">
     <div class="grid2">
       <label class="f">Cliente<select data-bind="PC.ccli" data-re="1">${optsCli(PC.ccli)}</select></label>
@@ -1271,6 +1273,7 @@ function blocoRadar(){
 const moeda = v => (Number(v)||0).toLocaleString("pt-BR",{style:"currency", currency:"BRL"});
 const numBR = s => { const t = String(s||"").replace(/[^\d,.-]/g,""); if(!t) return 0; const n = t.includes(",") ? t.replace(/\./g,"").replace(",",".") : t; return Number(n)||0; };
 const waLink = (tel, txt) => { const d = String(tel||"").replace(/\D/g,""); if(d.length<10) return ""; return `https://wa.me/${d.length<=11?"55"+d:d}?text=${encodeURIComponent(txt||"")}`; };
+const caminhoProcesso = (pid, nome) => `${S.perfil?.escritorio_id || S.escritorio?.id}/${pid}/${Date.now()}-${nomeArquivo(nome)}`;
 const nomeArquivo = n => String(n||"arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w.\-]+/g,"_").slice(-80);
 
 /* ---------- PORTAL DO CLIENTE (resumido) ---------- */
@@ -1292,6 +1295,8 @@ function vPortal(){
         <div class="row" style="gap:6px">${waLink(ct.telefone, msgWa(ps[0]))?`<a class="btn" href="${waLink(ct.telefone, msgWa(ps[0]))}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>`:""}${ct.telefone?`<a class="btn" href="tel:${esc(ct.telefone.replace(/[^\d+]/g,""))}">Ligar</a>`:""}${ct.email?`<a class="btn" href="mailto:${esc(ct.email)}">${ICON.mail}E-mail</a>`:""}</div></div>`:""}
       ${!advs.length && !ct.telefone && !ct.email?`<span class="small muted">O escritório ainda não cadastrou o contato. Responda à mensagem em que recebeu o link de acesso.</span>`:""}
     </div></div>`;
+  const evPortal = a => `<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div>${a.arquivo?`<button class="anexo" data-act="ver-arquivo" data-c="${esc(a.arquivo)}">${ICON.pdf}<span>${esc(a.arquivo_nome||"Abrir documento")}</span></button>`:""}</div>`;
+  const docsProc = ps.flatMap(p=>[].concat((p.andamentos||[]).filter(a=>a.arquivo).map(a=>({nome:a.arquivo_nome||a.texto, data:a.data, caminho:a.arquivo, p})), (p.documentos||[]).filter(d=>d.caminho && d.status!=="Aguardando cliente").map(d=>({nome:d.nome, data:d.data, caminho:d.caminho, p}))));
   const etapa = f => Math.max(0, ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento"].indexOf(f));
   const card = p => { const pd = (p.documentos||[]).filter(d=>d.status==="Aguardando cliente"); const and = p.andamentos||[];
     return `<div class="panel portal-proc"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
@@ -1300,15 +1305,17 @@ function vPortal(){
       ${p.resumo?`<div class="notice" style="font-size:.95rem;color:var(--ink)">${esc(p.resumo)}</div>`:""}
       ${(p.audiencias||[]).length?`<div class="small"><b>Próxima audiência:</b> ${fmt(p.audiencias[0].data)}${p.audiencias[0].hora?" às "+esc(p.audiencias[0].hora):""} · ${esc(p.audiencias[0].modalidade||"")} ${p.audiencias[0].local?"· "+esc(p.audiencias[0].local):""}</div>`:""}
       ${pd.length?`<div class="pend"><b>O escritório precisa destes documentos:</b>${pd.map(d=>`<div class="pend-i"><span>${esc(d.nome)}</span><label class="btn primary">${ICON.plus}Enviar<input type="file" hidden data-file="portal-doc" data-doc="${d.id}" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>`).join("")}</div>`:""}
-      <div><b class="small">Últimas movimentações</b>${and.length?`<div class="timeline" style="margin-top:8px">${and.slice(0,3).map(a=>`<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div></div>`).join("")}</div>${and.length>3?`<details><summary class="small gold" style="cursor:pointer;margin-top:6px">Ver todas (${and.length})</summary><div class="timeline" style="margin-top:8px">${and.slice(3).map(a=>`<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div></div>`).join("")}</div></details>`:""}`:`<div class="small muted" style="margin-top:6px">Ainda não há movimentações para mostrar.</div>`}</div>
-      ${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length?`<details><summary class="small muted" style="cursor:pointer">Documentos já entregues (${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length})</summary>${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").map(d=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>${esc(d.nome)}</span><span class="chip ok">${esc(d.status)}</span></div>`).join("")}</details>`:""}
+      <div><b class="small">Últimas movimentações</b>${and.length?`<div class="timeline" style="margin-top:8px">${and.slice(0,3).map(evPortal).join("")}</div>${and.length>3?`<details><summary class="small gold" style="cursor:pointer;margin-top:6px">Ver todas (${and.length})</summary><div class="timeline" style="margin-top:8px">${and.slice(3).map(evPortal).join("")}</div></details>`:""}`:`<div class="small muted" style="margin-top:6px">Ainda não há movimentações para mostrar.</div>`}</div>
+      ${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length?`<details><summary class="small muted" style="cursor:pointer">Documentos já entregues (${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length})</summary>${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").map(d=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>${esc(d.nome)}</span><span class="row" style="gap:8px">${d.caminho?`<button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.caminho)}">Abrir</button>`:""}<span class="chip ok">${esc(d.status)}</span></span></div>`).join("")}</details>`:""}
       <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="pn-${p.id}" placeholder="Enviar outro documento: escreva o nome" style="flex:1"><label class="btn">${ICON.plus}Arquivo<input type="file" hidden data-file="portal-novo" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>
       <button class="linkbtn small" data-act="pdf-portal" data-id="${p.id}" style="align-self:flex-start">Baixar resumo em PDF</button>
     </div></div>`; };
   return `<div class="portal-hero">${pt.logo?`<img src="${pt.logo}" alt="" style="max-height:44px;max-width:200px;background:#fff;border-radius:8px;padding:4px;margin-bottom:6px">`:`<span class="small gold" style="text-transform:uppercase;letter-spacing:.12em;font-weight:600">${esc(pt.escritorio)}</span>`}
     <h1>Olá, ${esc(P.primeiroNome(pt.cliente||S.perfil.nome))}</h1>
     <div class="portal-kpis"><div><b>${ps.length}</b><span>processo(s)</span></div><div><b>${auds[0]?fmtCurto(auds[0].data):"—"}</b><span>próxima audiência</span></div><div class="${pend.length?"alerta":""}"><b>${pend.length}</b><span>documento(s) para enviar</span></div></div></div>
-    <div class="portal-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">${ps.length?ps.map(card).join(""):`<div class="panel"><div class="empty"><p>Nenhum processo vinculado ao seu cadastro.</p></div></div>`}</div>${contatos}</div>`;
+    <div class="portal-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">${ps.length?ps.map(card).join(""):`<div class="panel"><div class="empty"><p>Nenhum processo vinculado ao seu cadastro.</p></div></div>`}</div><div class="portal-lado">${contatos}
+      ${docsProc.length?`<div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:8px"><h2 style="font-size:1.05rem;margin:0">Documentos do escritório</h2>
+        ${docsProc.sort((x,y)=>(y.data||"").localeCompare(x.data||"")).slice(0,12).map(d=>`<button class="anexo" data-act="ver-arquivo" data-c="${esc(d.caminho)}">${ICON.pdf}<span style="flex:1;text-align:left">${esc(d.nome)}</span><span class="small muted mono">${fmt(d.data)}</span></button>`).join("")}</div></div>`:""}</div></div>`;
 }
 async function enviarPortal(tipo, file, el){
   if(!file) return;
@@ -1587,7 +1594,7 @@ function mAgendaCelular(){
   </div><div class="sheet-f"><button class="btn primary" data-act="fechar">Fechar</button></div>`;
 }
 function baixarIcs(){
-  const L2 = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Pauta Juridica//PT-BR","CALSCALE:GREGORIAN"];
+  const L2 = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Meu Escritorio//PT-BR","CALSCALE:GREGORIAN"];
   const e = s => String(s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
   tarefasVisiveis().filter(t=>!t.done && t.data && t.data>=hoje()).forEach(t=>{ const p = procById(t.processo_id); const d = t.data.replace(/-/g,"");
     L2.push("BEGIN:VEVENT","UID:"+t.id+"@pauta","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z");
@@ -1807,6 +1814,200 @@ function blocoAssistenteJuridico(){
     <div class="composer" style="position:static;margin:0"><textarea id="dga-in" rows="1" data-bind="DGA.input" placeholder="Pergunte, cole um número de processo ou peça jurisprudência">${esc(DGA.input)}</textarea><button class="btn primary" data-act="dga-enviar" ${DGA.ocupado?"disabled":""}>Enviar</button></div>
     <div class="hint">Sem IA paga: as respostas vêm da base do app, da consulta pública de jurisprudência do TJSP e do DataJud (CNJ). STF, STJ, TST e outros TJs abrem por atalho, porque não permitem consulta automática. Confira sempre a fonte oficial.</div></div></div>`;
 }
+/* ---------- CONFIGURAÇÕES (logo, nome, layout dos documentos e modelos próprios) ---------- */
+const CFG = {aba:"escritorio", lay:null};
+const MODELO_CACHE = {};
+const modelosEsc = () => (P.cfg().modelos || []).slice().sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+const nomeTipo = t => (P.TIPOS_MODELO.find(x=>x[0]===t)||[,"Documento"])[1];
+async function salvarConfig(patchCfg, nome){
+  const cfg = Object.assign({}, P.cfg(), patchCfg);
+  S.escritorio = await api.atualizarEscritorio("escritorio", {nome: nome ?? S.escritorio?.nome ?? "", config:cfg}); P.escritorio = S.escritorio;
+}
+function layoutAtual(){ return Object.assign({cor:P.DOC_COR, cor2:P.DOC_OURO, fonte:"serif", tamanho:"12", entrelinha:"1.5", cabecalho:"esquerda", logoAltura:"media", rodape:""}, P.cfg().docs||{}, CFG.lay||{}); }
+function exemploDoc(d){
+  const corpo = `<h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</h1><div class="sub">Exemplo do layout</div>
+    <table class="partes"><tr><td><span class="r">Contratante</span><b>MARIA DA SILVA</b>, brasileira, casada, professora, CPF 000.000.000-00</td><td><span class="r">Contratado</span><b>${esc((d.nome||S.escritorio?.nome||"SEU ESCRITÓRIO").toUpperCase())}</b>${d.oab?", "+esc(d.oab):""}</td></tr></table>
+    <h2>1. Objeto</h2><p>Prestação de serviços advocatícios para ajuizamento de ação de indenização por danos morais, com acompanhamento até a decisão final.</p>
+    <h3>Honorários</h3><table class="cards"><tr><td>Entrada<b>R$ 1.500,00</b></td><td>Parcelas<b>5 × R$ 500,00</b></td><td>Êxito<b>20%</b></td></tr></table>
+    <div class="destaque">Os valores podem ser pagos por Pix ou boleto.</div><p class="local">São Paulo, ${new Date().toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"})}.</p>`;
+  return P.docVisual({docs:d, titulo:"Exemplo", corpo, escritorio:S.escritorio?.nome});
+}
+function vConfig(){
+  if(!pode("gerenciar_equipe")) return `<div class="panel"><div class="empty"><p>Só o gestor acessa as configurações.</p></div></div>`;
+  const abas = [["escritorio","Escritório"],["documentos","Layout dos documentos"],["modelos","Modelos de documentos"]];
+  const corpo = CFG.aba==="documentos" ? cfgDocumentos() : CFG.aba==="modelos" ? cfgModelos() : cfgEscritorio();
+  return `<div class="head"><div><h1>Configurações</h1><div class="sub">Nome e logo do escritório, layout dos PDFs e documentos, e os seus próprios modelos de contrato, procuração e petição.</div></div></div>
+  <div class="tabs" role="tablist"><span class="ind"></span>${abas.map(([k,l])=>`<button role="tab" aria-selected="${CFG.aba===k}" data-act="cfg-aba" data-a="${k}">${l}</button>`).join("")}</div>${corpo}`;
+}
+function cfgEscritorio(){
+  const dc = P.cfg().docs || {}, cfg = P.cfg(), logo = LOGO_TMP ?? dc.logo;
+  return `<form id="f-escritorio" class="cfg-grid" autocomplete="off">
+  <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="font-size:1.05rem;margin:0">Identidade</h2>
+    <label class="f">Nome do escritório<input type="text" id="a-nome" value="${esc(S.escritorio?.nome||"")}"><span class="hint">Aparece no menu, no portal do cliente, nas mensagens e nos PDFs.</span></label>
+    <div class="f"><span>Logo</span><div class="logo-box">${logo?`<img id="a-logo-prev" src="${logo}" alt="Logo do escritório">`:`<img id="a-logo-prev" alt="" hidden><span class="small muted" id="a-logo-vazio">Nenhum logo enviado</span>`}</div>
+      <div class="row" style="gap:8px"><label class="btn">${ICON.plus}${logo?"Trocar logo":"Enviar logo"}<input type="file" id="a-logo" accept="image/png,image/jpeg" hidden></label>${logo?`<button type="button" class="btn ghost" data-act="cfg-logo-remover">Remover</button>`:""}</div>
+      <span class="hint">PNG ou JPG. Sai no topo dos documentos, dos PDFs e do portal do cliente.</span></div>
+    <div class="notice small">Cores do sistema: o padrão é azul marinho e dourado. <button type="button" class="linkbtn" data-act="aparencia">Personalizar aparência</button></div>
+  </div></div>
+  <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="font-size:1.05rem;margin:0">Dados que entram nos documentos</h2>
+    <div class="grid2">
+      <label class="f">Nome / razão social<input type="text" id="d-nome" value="${esc(dc.nome||S.escritorio?.nome||"")}"></label>
+      <label class="f">CNPJ<input type="text" id="d-cnpj" value="${esc(dc.cnpj||"")}"></label>
+      <label class="f">Registro da sociedade na OAB<input type="text" id="d-oab" value="${esc(dc.oab||"")}" placeholder="OAB/SP nº 00.000"></label>
+      <label class="f">Cidade (foro e assinatura)<input type="text" id="d-cidade" value="${esc(dc.cidade||"")}" placeholder="São Paulo/SP"></label>
+      <label class="f span2">Endereço completo<input type="text" id="d-end" value="${esc(dc.endereco||"")}"></label>
+      <label class="f">Telefone / WhatsApp<input type="text" id="d-tel" value="${esc(dc.telefone||"")}"></label>
+      <label class="f">E-mail<input type="email" id="d-email" value="${esc(dc.email||"")}"></label>
+      <label class="f span2">Advogados (um por linha: nome, OAB/UF nº, e-mail)<textarea id="d-advs" rows="3" placeholder="Maria Silva, OAB/SP nº 123.456, maria@escritorio.com.br">${esc(dc.advogados||"")}</textarea></label>
+    </div></div></div>
+  <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="font-size:1.05rem;margin:0">Prazos</h2>
+    <label class="f">Margem do prazo interno (dias úteis)<input type="number" id="a-margem" min="0" max="15" value="${esc(cfg.margem ?? 2)}"></label>
+    <label class="f">Feriados locais e do tribunal (um por linha: DD/MM ou DD/MM/AAAA)<textarea id="a-fer" rows="4" placeholder="25/01 Aniversário de São Paulo&#10;09/07 Revolução Constitucionalista">${esc(cfg.feriadosLocais||"")}</textarea><span class="hint">Feriados nacionais, Carnaval, Sexta-feira Santa, Corpus Christi e o recesso de 20/12 a 20/01 já entram no cálculo.</span></label>
+  </div></div>
+  <div class="cfg-save"><button class="btn primary" type="submit">Salvar configurações</button></div></form>`;
+}
+function cfgDocumentos(){
+  const d = layoutAtual();
+  const sel = (id, k, lista) => `<select id="${id}" data-lay="${k}">${opts(lista, String(d[k]))}</select>`;
+  return `<div class="cfg-doc">
+  <div class="panel"><form class="panel-b" id="f-layout" style="display:flex;flex-direction:column;gap:14px" autocomplete="off">
+    <h2 style="font-size:1.05rem;margin:0">Layout dos documentos e PDFs</h2>
+    <div class="small muted">Vale para as peças, contratos, procurações e checklists gerados pelo app, e para os relatórios em PDF.</div>
+    <div class="grid2">
+      <label class="f">Cor principal<input type="color" id="d-cor" data-lay="cor" value="${esc(d.cor)}"></label>
+      <label class="f">Cor de destaque<input type="color" id="d-cor2" data-lay="cor2" value="${esc(d.cor2)}"></label>
+      <label class="f">Fonte do texto${sel("d-fonte","fonte",[["serif","Georgia (clássica)"],["garamond","Garamond"],["sans","Arial"],["calibri","Calibri"]])}</label>
+      <label class="f">Tamanho da letra${sel("d-tam","tamanho",[["11","11"],["12","12"],["13","13"]])}</label>
+      <label class="f">Espaço entre linhas${sel("d-ent","entrelinha",[["1.15","Simples"],["1.5","1,5"],["2","Duplo"]])}</label>
+      <label class="f">Cabeçalho${sel("d-cab","cabecalho",[["esquerda","Logo à esquerda, dados à direita"],["centro","Logo centralizado"],["nenhum","Sem cabeçalho (papel timbrado)"]])}</label>
+      <label class="f">Tamanho do logo${sel("d-logoalt","logoAltura",[["pequena","Pequeno"],["media","Médio"],["grande","Grande"]])}</label>
+      <label class="f span2">Rodapé<input type="text" id="d-rod" data-lay="rodape" value="${esc(d.rodape||"")}" placeholder="Vazio = endereço · telefone · e-mail do escritório"></label>
+    </div>
+    <div class="row" style="justify-content:space-between;gap:8px"><button type="button" class="btn ghost" data-act="cfg-lay-padrao">Voltar ao padrão (azul marinho e dourado)</button><button type="button" class="btn primary" data-act="cfg-lay-salvar">Salvar layout</button></div>
+  </form></div>
+  <div class="panel cfg-prev"><div class="panel-h"><h2>Prévia</h2><span class="small muted">atualiza enquanto você muda</span></div><iframe id="lay-prev" title="Prévia do documento" srcdoc="${esc(exemploDoc(d))}"></iframe></div></div>`;
+}
+function cfgModelos(){
+  const ms = modelosEsc();
+  return `<div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-size:1.05rem;margin:0">Seus modelos em Word</h2>
+    <div class="passos-cfg">
+      <div><b>1</b><span>Abra no Word o contrato, procuração ou petição que o escritório já usa.</span></div>
+      <div><b>2</b><span>Troque os dados que mudam por campos entre chaves duplas, como <code>{{CLIENTE_NOME}}</code> ou <code>{{CLIENTE_QUALIFICACAO}}</code>. A lista está abaixo.</span></div>
+      <div><b>3</b><span>Envie o arquivo aqui. Ao gerar, o documento sai com a mesma formatação, timbre, logo, fontes e margens do seu arquivo.</span></div></div>
+    <div class="row" style="gap:8px"><label class="btn primary">${ICON.plus}Enviar modelo (.docx)<input type="file" hidden data-file="modelo-docx" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label><button class="btn" data-act="mdx-exemplo">${ICON.pdf}Baixar modelo de exemplo</button></div>
+  </div></div>
+  <div class="panel"><div class="panel-h"><h2>Modelos cadastrados</h2><span class="small muted">${ms.length} modelo(s)</span></div>
+    ${ms.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Modelo</th><th>Tipo</th><th>Campos</th><th></th></tr></thead><tbody>${ms.map(m=>`<tr style="cursor:default"><td><b style="font-weight:600">${esc(m.nome)}</b><div class="small muted">${esc(m.arquivo_nome||"")}</div></td><td><span class="chip neutral">${esc(nomeTipo(m.tipo))}</span></td><td class="small">${(m.campos||[]).length}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn primary" data-act="mdx-usar" data-id="${m.id}">Gerar documento</button> <button class="btn ghost" data-act="mdx-original" data-id="${m.id}">Original</button> <button class="btn ghost" data-act="mdx-excluir" data-id="${m.id}">Excluir</button></td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty small"><p>Nenhum modelo ainda. Envie o primeiro ou baixe o exemplo para ver como funciona.</p></div>`}</div>
+  ${painelCampos()}`;
+}
+function painelCampos(){
+  return `<div class="panel"><div class="panel-h"><h2>Campos disponíveis</h2><span class="small muted">clique para copiar e cole no Word</span></div><div class="panel-b campos-grid">
+    ${P.CAMPOS_MODELO.map(([g,l])=>`<div><h3 style="margin-bottom:6px">${esc(g)}</h3>${l.map(([k,r])=>`<button class="campo" data-act="mdx-copiar" data-k="${k}"><code>{{${k}}}</code><span>${esc(r)}</span></button>`).join("")}</div>`).join("")}
+    <div class="hint" style="grid-column:1/-1">Também vale criar campos novos, como <code>{{PRAZO_ENTREGA}}</code>: o app pede o valor na hora de gerar.</div></div></div>`;
+}
+const adivinharTipo = n => { const x = nrm(n); return /contrat|honorar/.test(x)?"contrato":/procura/.test(x)?"procuracao":/declara/.test(x)?"declaracao":/notifica|carta/.test(x)?"notificacao":/peti|inicial|contesta|recurso|manifesta|replica|apela/.test(x)?"peticao":"outro"; };
+async function receberModeloDocx(file){
+  if(!file) return;
+  if(!/\.docx$/i.test(file.name)){ toast(/\.doc$/i.test(file.name) ? "Arquivo .doc antigo: abra no Word e salve como .docx." : "Envie um arquivo do Word (.docx)."); return; }
+  if(file.size > 10*1024*1024){ toast("Arquivo maior que 10 MB."); return; }
+  try{ const buf = await file.arrayBuffer(); const r = await P.lerCamposDocx(buf);
+    abrirModal({kind:"novoModelo", file, buf, campos:r.campos, nome:file.name.replace(/\.docx$/i,"").replace(/[_-]+/g," "), tipo:adivinharTipo(file.name)}); }
+  catch(e){ toast(P.erroAmigavel(e)); }
+}
+function mNovoModelo(m){
+  const conhecidos = new Set(P.CAMPOS_MODELO.flatMap(([,l])=>l.map(x=>x[0])));
+  return cab("Novo modelo", esc(m.file.name)) + `<div class="sheet-b">
+    <div class="grid2"><label class="f">Nome do modelo<input type="text" id="nm-nome" value="${esc(m.nome)}"></label><label class="f">Tipo<select id="nm-tipo">${opts(P.TIPOS_MODELO, m.tipo)}</select></label></div>
+    ${m.campos.length?`<div><h3 style="margin-bottom:8px">Campos encontrados (${m.campos.length})</h3><div class="row" style="gap:6px">${m.campos.map(k=>`<span class="chip ${conhecidos.has(k)?"ok":"warn"}" title="${conhecidos.has(k)?"preenchido automaticamente":"você digita na hora de gerar"}">{{${esc(k)}}}</span>`).join("")}</div>
+      <div class="hint" style="margin-top:6px">Verdes: o app preenche sozinho com os dados do cliente, do processo e do escritório. Amarelos: você digita na hora de gerar.</div></div>`
+    :`<div class="notice">Não encontrei campos <code>{{...}}</code> neste arquivo. Ele pode ser salvo assim mesmo, mas vai sair igual ao original. Para o app preencher, troque no Word os dados do cliente por campos como <code>{{CLIENTE_NOME}}</code> e envie de novo.</div>`}
+  </div><div class="sheet-f"><button class="btn" data-act="fechar">Cancelar</button><button class="btn primary" data-act="mdx-salvar">Salvar modelo</button></div>`;
+}
+async function arquivoModelo(m){
+  if(MODELO_CACHE[m.caminho]) return MODELO_CACHE[m.caminho];
+  const b = await api.baixarArquivo(m.caminho); const buf = await b.arrayBuffer(); MODELO_CACHE[m.caminho] = buf; return buf;
+}
+function valoresDoModal(mm){
+  const c = cliById(mm.cliente_id), p = procById(mm.processo_id);
+  const base = P.valoresModelo({cliente:c, processo:p, docs:P.cfg().docs||{}, escritorio:S.escritorio?.nome, area:p?AREAS[p.area]?.nome:""});
+  return Object.assign(base, mm.vals||{});
+}
+function mGerarModelo(m){
+  const mod = (P.cfg().modelos||[]).find(x=>x.id===m.mid); if(!mod) return cab("Modelo não encontrado") + `<div class="sheet-b"><p>Este modelo foi removido.</p></div>`;
+  const v = valoresDoModal(m), campos = mod.campos||[];
+  const procs = S.processos.filter(p=>!m.cliente_id || p.cliente_id===m.cliente_id);
+  const vazios = campos.filter(k=>!String(v[k]??"").trim());
+  return cab(esc(mod.nome), esc(nomeTipo(mod.tipo))+" · sai com a formatação do seu arquivo") + `<div class="sheet-b">
+    <div class="grid2"><label class="f">Cliente<select id="mdx-cli" data-mdx="cliente_id">${optsCli(m.cliente_id)}</select></label>
+      <label class="f">Processo (opcional)<select id="mdx-proc" data-mdx="processo_id"><option value="">Sem processo</option>${opts(procs.map(p=>[p.id, (p.numero||"sem número")+" · "+nomeCliente(p)]), m.processo_id)}</select></label></div>
+    ${campos.length?`<div><div class="row" style="justify-content:space-between"><h3>Campos do documento</h3>${vazios.length?`<span class="chip warn">${vazios.length} em branco</span>`:`<span class="chip ok">tudo preenchido</span>`}</div>
+      <div class="grid2" style="margin-top:8px">${campos.map(k=>`<label class="f ${["CLIENTE_QUALIFICACAO","OBJETO","ADVOGADOS"].includes(k)?"span2":""}"><span>${esc(P.ROTULO_CAMPO(k))} <code class="campo-k">{{${esc(k)}}}</code></span>${k==="CLIENTE_QUALIFICACAO"||k==="OBJETO"?`<textarea rows="2" data-mdxv="${k}" class="${String(v[k]??"").trim()?"":"vazio"}">${esc(v[k]??"")}</textarea>`:`<input type="text" data-mdxv="${k}" value="${esc(v[k]??"")}" class="${String(v[k]??"").trim()?"":"vazio"}">`}</label>`).join("")}</div>
+      <div class="hint">Campos em branco saem como "__________" para preencher à mão. Para completar o cadastro do cliente, abra a ficha dele em Clientes.</div></div>`
+    :`<div class="notice">Este modelo não tem campos {{...}}: o arquivo sai igual ao original.</div>`}
+    <div id="mdx-prev" class="mdx-prev" ${m.prev?"":"hidden"}></div>
+  </div><div class="sheet-f">${m.processo_id?`<button class="btn ghost" data-act="mdx-anexar" style="margin-right:auto">Anexar ao processo</button>`:""}<button class="btn" data-act="mdx-ver">Visualizar</button><button class="btn" data-act="mdx-pdf">${ICON.pdf}Salvar PDF</button><button class="btn primary" data-act="mdx-word">Baixar Word</button></div>`;
+}
+async function gerarBlobModelo(){
+  const mod = (P.cfg().modelos||[]).find(x=>x.id===modal.mid);
+  lerValoresMdx();
+  const buf = await arquivoModelo(mod);
+  return {mod, blob: await P.preencherDocx(buf, valoresDoModal(modal))};
+}
+function lerValoresMdx(){ if(!modal || modal.kind!=="gerarModelo") return; modal.vals = modal.vals || {}; document.querySelectorAll("[data-mdxv]").forEach(x=>{ modal.vals[x.dataset.mdxv] = x.value; }); }
+const nomeGerado = (mod) => { const c = cliById(modal.cliente_id); return `${mod.nome}${c?" - "+c.nome:""}`.replace(/[\\/:*?"<>|]+/g,"").slice(0,90); };
+async function acaoConfig(a, el){
+  const id = el.dataset.id;
+  switch(a){
+    case "cfg-aba": CFG.aba = el.dataset.a; render(); return true;
+    case "cfg-logo-remover": LOGO_TMP = ""; render(); toast("Logo removido. Clique em Salvar configurações."); return true;
+    case "cfg-lay-padrao": CFG.lay = {cor:P.DOC_COR, cor2:P.DOC_OURO, fonte:"serif", tamanho:"12", entrelinha:"1.5", cabecalho:"esquerda", logoAltura:"media", rodape:""}; render(); return true;
+    case "cfg-lay-salvar": { const lay = layoutAtual(); const docs = Object.assign({}, P.cfg().docs||{}, {cor:lay.cor, cor2:lay.cor2, fonte:lay.fonte, tamanho:lay.tamanho, entrelinha:lay.entrelinha, cabecalho:lay.cabecalho, logoAltura:lay.logoAltura, rodape:lay.rodape});
+      await comErro(async()=>{ await salvarConfig({docs}); CFG.lay = null; toast("Layout salvo. Os próximos documentos já saem assim."); render(); sincronizarTodos(); }); return true; }
+    case "mdx-copiar": P.copiar("{{"+el.dataset.k+"}}"); return true;
+    case "mdx-exemplo": await comErro(async()=>{ const b = await P.docxExemplo(P.cfg().docs||{}); baixarBlob(b, "Modelo de exemplo - contrato de honorarios.docx"); }); return true;
+    case "mdx-salvar": { const nome = $("#nm-nome").value.trim() || modal.nome, tipo = $("#nm-tipo").value, m = modal; el.disabled = true;
+      await comErro(async()=>{ const caminho = `${S.perfil.escritorio_id || S.escritorio?.id}/modelos/${Date.now()}-${nomeArquivo(m.file.name)}`;
+        await api.enviarArquivo(caminho, m.file); MODELO_CACHE[caminho] = m.buf;
+        const item = {id:P.uid(), nome, tipo, caminho, campos:m.campos, arquivo_nome:m.file.name, criado_em:new Date().toISOString()};
+        await salvarConfig({modelos:(P.cfg().modelos||[]).concat([item])}); fecharModal(); toast("Modelo salvo"); render(); });
+      el.disabled = false; return true; }
+    case "mdx-usar": abrirModal({kind:"gerarModelo", mid:id, cliente_id:el.dataset.cli||"", processo_id:el.dataset.proc||""}); return true;
+    case "mdx-original": { const mod = (P.cfg().modelos||[]).find(x=>x.id===id); await comErro(async()=>{ const buf = await arquivoModelo(mod); baixarBlob(new Blob([buf]), mod.arquivo_nome||mod.nome+".docx"); }); return true; }
+    case "mdx-excluir": { if(!confirmar(el, "mdx"+id, "Confirmar exclusão")) return true; const mod = (P.cfg().modelos||[]).find(x=>x.id===id);
+      await comErro(async()=>{ await salvarConfig({modelos:(P.cfg().modelos||[]).filter(x=>x.id!==id)}); try{ if(api.apagarArquivo) await api.apagarArquivo(mod.caminho); }catch(_){} toast("Modelo excluído"); render(); }); return true; }
+    case "mdx-word": await comErro(async()=>{ const {mod, blob} = await gerarBlobModelo(); baixarBlob(blob, nomeGerado(mod)+".docx"); toast("Documento gerado"); }); return true;
+    case "mdx-ver": case "mdx-pdf": { el.disabled = true; const t = el.innerHTML; el.innerHTML = `<span class="spinner"></span> Montando…`;
+      await comErro(async()=>{ const {mod, blob} = await gerarBlobModelo(); const alvo = $("#mdx-prev"); alvo.hidden = false; modal.prev = true; await P.mostrarDocx(blob, alvo); if(a==="mdx-pdf") P.imprimirDocx(alvo, nomeGerado(mod)); else alvo.scrollIntoView({block:"start", behavior:"smooth"}); });
+      el.disabled = false; el.innerHTML = t; return true; }
+    case "mdx-anexar": { el.disabled = true; await comErro(async()=>{ const {mod, blob} = await gerarBlobModelo(); const nome = nomeGerado(mod)+".docx"; const f = new File([blob], nome, {type:blob.type});
+        const caminho = await api.enviarArquivo(caminhoProcesso(modal.processo_id, nome), f);
+        await api.inserir("documentos", {processo_id:modal.processo_id, nome:nomeGerado(mod), status:"Rascunho", data:hoje(), visivel_cliente:false, arquivo:caminho}); agendarRecarga("documentos");
+        toast("Anexado em Documentos do processo (interno). Mostre ao cliente quando quiser."); }); el.disabled = false; return true; }
+  }
+  return false;
+}
+function baixarBlob(b, nome){ const u = URL.createObjectURL(b), a = document.createElement("a"); a.href = u; a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u), 4000); }
+function blocoMeusModelos(tipos, cid){
+  const ms = modelosEsc().filter(m=>!tipos || tipos.includes(m.tipo));
+  if(!ms.length) return "";
+  return `<div class="notice" style="display:flex;flex-direction:column;gap:8px"><b>Modelos do escritório</b><span class="small">Gere no seu próprio arquivo Word, com a formatação original.</span><div class="row" style="gap:6px">${ms.map(m=>`<button class="btn" data-act="mdx-usar" data-id="${m.id}" data-cli="${esc(cid||"")}">${esc(m.nome)}</button>`).join("")}</div></div>`;
+}
+function pcMeusModelos(){
+  const ms = modelosEsc();
+  return `<div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-size:1.05rem;margin:0">Modelos do escritório</h2>
+    <div class="small muted">Contratos, procurações e petições do próprio escritório, em Word. O documento sai com a formatação do arquivo original, preenchido com os dados do cliente e do processo.</div>
+    ${ms.length?`<div class="tbl-wrap"><table class="tbl"><tbody>${ms.map(m=>`<tr style="cursor:default"><td><b style="font-weight:600">${esc(m.nome)}</b><div class="small muted">${esc(nomeTipo(m.tipo))} · ${(m.campos||[]).length} campo(s)</div></td><td style="text-align:right"><button class="btn primary" data-act="mdx-usar" data-id="${m.id}">Gerar documento</button></td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty small"><p>Nenhum modelo cadastrado.${pode("gerenciar_equipe")?"":" Peça ao gestor para enviar os modelos em Configurações."}</p></div>`}
+    ${pode("gerenciar_equipe")?`<div class="row"><button class="btn" data-act="cfg-ir-modelos">${ICON.plus}Enviar ou gerenciar modelos</button></div>`:""}
+  </div></div>`;
+}
 /* ---------- RELATÓRIOS ---------- */
 function vRelatorios(){
   const ps = S.processos.slice().sort((a,b)=>nomeCliente(a).localeCompare(nomeCliente(b)));
@@ -1858,25 +2059,7 @@ function vEquipe(){
     <td><span class="chip ${u.papel==="gestor"?"accent":"neutral"}">${P.PAPEIS[u.papel]||""}</span></td><td><span class="chip ${u.status==="ativo"?"ok":"danger"}">${u.status==="ativo"?"Ativo":"Bloqueado"}</span></td><td class="small">${esc(n)}</td></tr>`; }).join("")}
   </tbody></table></div></div>
   <div class="panel"><div class="panel-h"><h2>Clientes com acesso ao portal</h2></div>${clientesAcesso.length?`<div class="tbl-wrap"><table class="tbl"><tbody>${clientesAcesso.map(u=>`<tr data-act="editar-usuario" data-id="${u.id}"><td><b style="font-weight:600">${esc(u.nome||"")}</b><div class="small muted">${esc(u.email||"")}</div></td><td class="small">${esc(cliById(u.cliente_id)?.nome||"Sem cliente vinculado")}</td><td><span class="chip ${u.status==="ativo"?"ok":"danger"}">${u.status==="ativo"?"Ativo":"Bloqueado"}</span></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty small"><p>Nenhum cliente com acesso. Na ficha do cliente, use "Criar link de acesso".</p></div>`}</div>
-  <div class="panel"><div class="panel-h"><h2>Ajustes do escritório</h2></div><form class="panel-b" id="f-escritorio" style="display:flex;flex-direction:column;gap:14px">
-    <div class="grid2"><label class="f">Nome do escritório<input type="text" id="a-nome" value="${esc(S.escritorio?.nome||"")}"></label>
-    <label class="f">Margem do prazo interno (dias úteis)<input type="number" id="a-margem" min="0" max="15" value="${esc(cfg.margem ?? 2)}"></label></div>
-    <label class="f">Feriados locais e do tribunal (um por linha: DD/MM para todo ano, ou DD/MM/AAAA)<textarea id="a-fer" rows="4" placeholder="25/01 Aniversário de São Paulo&#10;09/07 Revolução Constitucionalista&#10;08/12 Dia da Justiça">${esc(cfg.feriadosLocais||"")}</textarea><span class="hint">Feriados nacionais, Carnaval, Sexta-feira Santa, Corpus Christi e o recesso de 20/12 a 20/01 já entram no cálculo.</span></label>
-    <h3 style="margin:6px 0 0">Dados para documentos (contrato, procuração e peças)</h3>
-    <div class="grid2">
-      <label class="f">Nome / razão social<input type="text" id="d-nome" value="${esc(dc.nome||S.escritorio?.nome||"")}"></label>
-      <label class="f">CNPJ<input type="text" id="d-cnpj" value="${esc(dc.cnpj||"")}"></label>
-      <label class="f">Registro da sociedade na OAB<input type="text" id="d-oab" value="${esc(dc.oab||"")}" placeholder="OAB/SP nº 00.000"></label>
-      <label class="f">Cidade padrão (foro e assinatura)<input type="text" id="d-cidade" value="${esc(dc.cidade||"")}" placeholder="São Paulo/SP"></label>
-      <label class="f span2">Endereço completo<input type="text" id="d-end" value="${esc(dc.endereco||"")}"></label>
-      <label class="f">Telefone<input type="text" id="d-tel" value="${esc(dc.telefone||"")}"></label>
-      <label class="f">E-mail<input type="email" id="d-email" value="${esc(dc.email||"")}"></label>
-      <label class="f span2">Advogados (um por linha: nome, OAB/UF nº, e-mail)<textarea id="d-advs" rows="3" placeholder="Maria Silva, OAB/SP nº 123.456, maria@escritorio.com.br">${esc(dc.advogados||"")}</textarea></label>
-      <label class="f">Cor principal<input type="color" id="d-cor" value="${esc(dc.cor||"#1f3a2e")}"></label>
-      <label class="f">Cor de destaque<input type="color" id="d-cor2" value="${esc(dc.cor2||"#b8924a")}"></label>
-      <label class="f span2">Logo (PNG ou JPG)<input type="file" id="a-logo" accept="image/png,image/jpeg"><img id="a-logo-prev" alt="" ${dc.logo?`src="${dc.logo}"`:"hidden"} style="max-height:56px;max-width:220px;margin-top:8px;background:#fff;padding:4px;border-radius:8px"></label>
-    </div>
-    <div class="row" style="justify-content:flex-end"><button class="btn primary" type="submit">Salvar ajustes</button></div></form></div>`;
+  <div class="notice">Nome, logo, dados dos documentos, layout dos PDFs e modelos próprios ficam em <button class="linkbtn" data-act="nav" data-v="config">Configurações</button>.</div>`;
 }
 function mConvite(m){
   const c = m.c || (m.c = Object.assign({nome:"", email:"", papel:"advogado", cliente_id:"", dias:7, permissoes:Object.assign({}, P.PADRAO.advogado)}, m.pre||{}));
@@ -1900,6 +2083,48 @@ function mConvite(m){
 }
 function lerConviteForm(){ const c = modal.c; c.nome = $("#cv-n").value.trim(); c.email = $("#cv-e").value.trim(); c.papel = $("#cv-p").value; c.dias = Number($("#cv-d").value); const cl = $("#cv-cli"); if(cl) c.cliente_id = cl.value; const pm = Object.assign({}, c.permissoes); document.querySelectorAll("[data-cperm]").forEach(x=>pm[x.dataset.cperm] = x.checked); c.permissoes = pm; return c; }
 function textoConvite(c){ return `Olá${c.nome?", "+P.primeiroNome(c.nome):""}! Você foi convidado(a) para acessar ${c.papel==="cliente"?"o acompanhamento dos seus processos com":"a área da equipe do"} ${S.escritorio?.nome||"escritório"}.\n\n1. Abra o link: ${c.link}\n2. Confira seu nome${c.email?" e use o e-mail "+c.email:""}\n3. Crie sua senha\n\n${c.expira_em?`O link vale até ${P.fmt(c.expira_em.slice(0,10))} e pode ser usado uma vez.`:"O link pode ser usado uma vez."} ${c.papel==="cliente" ? "Para acessar depois, entre em: "+location.origin+location.pathname+"?portal=1" : "Depois disso, é só entrar pelo mesmo endereço com e-mail e senha."}`; }
+/* ---------- acesso do cliente ao portal (fluxo simples) ---------- */
+function acessoCliente(cid){
+  const u = (S.perfis||[]).find(x=>x.papel==="cliente" && x.cliente_id===cid);
+  if(u) return {estado: u.status==="ativo" ? "ativo" : "bloqueado", perfil:u};
+  const cv = (S.convites||[]).filter(x=>x.cliente_id===cid && situacaoConvite(x)[0]==="Aguardando").sort((a,b)=>(b.criado_em||"").localeCompare(a.criado_em||""))[0];
+  return cv ? {estado:"enviado", convite:cv} : {estado:"sem"};
+}
+const CHIP_ACESSO = {ativo:["ok","Acessando o portal"], bloqueado:["danger","Acesso bloqueado"], enviado:["warn","Link enviado"], sem:["neutral","Sem acesso"]};
+const enderecoPortal = () => location.origin + location.pathname + "?portal=1";
+async function liberarAcessoCliente(cid){
+  const c = cliById(cid) || (RAW.clientes||[]).find(x=>x.id===cid); if(!c) return;
+  const ja = acessoCliente(cid);
+  if(ja.estado==="enviado" || ja.estado==="ativo" || ja.estado==="bloqueado"){ abrirModal({kind:"acessoCliente", cid}); return; }
+  await comErro(async()=>{
+    const r = await api.inserir("convites", {nome:c.nome, email:null, papel:"cliente", permissoes:Object.assign({}, P.PADRAO.cliente), cliente_id:cid, expira_em:null});
+    S.convites = [r].concat(S.convites||[]); agendarRecarga("convites");
+    abrirModal({kind:"acessoCliente", cid, novo:true});
+  });
+}
+function msgAcessoCliente(c, link){
+  const esc_ = S.escritorio?.nome || "escritório";
+  return link
+    ? `Olá, ${P.primeiroNome(c.nome)}! Aqui é do ${esc_}.\n\nVocê já pode acompanhar seus processos pelo celular ou computador, a qualquer hora:\n${link}\n\nNo primeiro acesso, é só confirmar seu nome e criar uma senha. Depois, entre sempre por: ${enderecoPortal()}\n\nPor lá você vê as atualizações, as audiências, os documentos que enviamos e fala direto com o seu advogado.`
+    : `Olá, ${P.primeiroNome(c.nome)}! Aqui é do ${esc_}.\n\nPara acompanhar seus processos, entre em:\n${enderecoPortal()}\n\nUse o e-mail e a senha que você criou no primeiro acesso.`;
+}
+function mAcessoCliente(m){
+  const c = cliById(m.cid) || {nome:"Cliente"}, a = acessoCliente(m.cid);
+  const link = a.convite ? linkConvite(a.convite) : "";
+  const msg = msgAcessoCliente(c, a.estado==="enviado" ? link : "");
+  const tel = P.soDigitos(c.telefone||""), wa = tel ? `https://wa.me/${tel.length<=11?"55"+tel:tel}?text=${encodeURIComponent(msg)}` : "";
+  const mail = c.email ? `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent("Acompanhe seus processos · "+(S.escritorio?.nome||""))}&body=${encodeURIComponent(msg)}` : "";
+  const [cl, st] = CHIP_ACESSO[a.estado];
+  return cab(a.estado==="enviado" && m.novo ? "Acesso liberado" : "Acesso de "+esc(c.nome), "Portal do cliente") + `<div class="sheet-b">
+    <div class="row" style="justify-content:space-between"><span class="chip ${cl}">${st}</span>${a.perfil?`<span class="small muted">${esc(a.perfil.email||"")}</span>`:""}</div>
+    ${a.estado==="enviado"?`<div class="notice">${m.novo?"Pronto! ":""}Envie a mensagem abaixo para <b>${esc(c.nome)}</b>. No primeiro acesso ele confirma o nome e cria uma senha. O link é pessoal, não expira e vale para um cadastro.</div>`
+      : a.estado==="ativo"?`<div class="notice">${esc(P.primeiroNome(c.nome))} já tem acesso. Se ele esqueceu como entrar, envie o endereço do portal.</div>`
+      : `<div class="notice">O acesso está bloqueado. Desbloqueie para ele voltar a ver os processos.</div>`}
+    ${a.estado!=="bloqueado"?`<label class="f">Mensagem<textarea id="ac-msg" rows="8">${esc(msg)}</textarea></label>`:""}
+    ${a.estado==="enviado"?`<label class="f">Link de acesso<input type="text" readonly class="mono" value="${esc(link)}" onfocus="this.select()"></label>`:""}
+    ${a.estado!=="bloqueado"?`<div class="row" style="gap:8px">${wa?`<a class="btn primary" href="${wa}" target="_blank" rel="noopener">${ICON.wa}Enviar no WhatsApp</a>`:`<span class="small muted">Cadastre o celular do cliente para enviar pelo WhatsApp.</span>`}${mail?`<a class="btn" href="${mail}">${ICON.mail}Enviar por e-mail</a>`:""}<button class="btn" data-act="copiar-ac-msg">${ICON.copy}Copiar mensagem</button></div>`:""}
+  </div><div class="sheet-f">${a.perfil?`<button class="btn ghost" data-act="ac-bloquear" data-id="${a.perfil.id}" style="margin-right:auto">${a.estado==="bloqueado"?"Desbloquear acesso":"Bloquear acesso"}</button>`:a.convite?`<button class="btn ghost" data-act="ac-cancelar" data-id="${a.convite.id}" style="margin-right:auto">Cancelar link</button>`:""}<button class="btn" data-act="editar-cliente" data-id="${m.cid}">Ver cadastro</button><button class="btn primary" data-act="fechar">Concluir</button></div>`;
+}
 function mCliente(m){
   const c = m.c || (m.c = m.id ? Object.assign({}, cliById(m.id)) : {tipo:"PF"});
   const ps = m.id ? S.processos.filter(p=>p.cliente_id===m.id) : [];
@@ -1907,8 +2132,12 @@ function mCliente(m){
   const acessos = m.id ? S.perfis.filter(u=>u.papel==="cliente" && u.cliente_id===m.id) : [];
   const convPend = m.id ? (S.convites||[]).filter(x=>x.cliente_id===m.id && situacaoConvite(x)[0]==="Aguardando") : [];
   let portal = "";
-  if(m.id && pode("gerenciar_equipe")) portal = `<div class="notice" style="display:flex;flex-direction:column;gap:10px"><div><b>Portal do cliente:</b> ${acessos.length?acessos.map(u=>`${esc(u.nome)} (${esc(u.email||"")}) ${u.status==="ativo"?"tem acesso":"está bloqueado"}`).join("; "):convPend.length?"link de convite enviado e aguardando uso.":"o cliente ainda não tem acesso."}</div>
-      <div class="row"><button type="button" class="btn" data-act="convite-cliente" data-id="${m.id}">${ICON.send}Criar link de acesso</button>${acessos.map(u=>`<button type="button" class="btn ghost" data-act="editar-usuario" data-id="${u.id}">Acessos de ${esc(P.primeiroNome(u.nome))}</button>`).join("")}</div></div>`;
+  if(pode("gerenciar_equipe")){
+    if(!m.id) portal = `<label class="check notice" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="c-portal" ${c._portal===false?"":"checked"}><span><b>Liberar acesso ao portal ao salvar</b><br><span class="small muted">O app cria o link do cliente na hora e prepara a mensagem para enviar por WhatsApp ou e-mail.</span></span></label>`;
+    else { const a = acessoCliente(m.id), [cl, st] = CHIP_ACESSO[a.estado];
+      portal = `<div class="notice" style="display:flex;flex-direction:column;gap:10px"><div class="row" style="justify-content:space-between"><b>Acesso ao portal</b><span class="chip ${cl}">${st}</span></div>
+        <div class="row" style="gap:8px"><button type="button" class="btn primary" data-act="ac-liberar" data-id="${m.id}">${ICON.send}${a.estado==="sem"?"Liberar acesso e enviar link":a.estado==="enviado"?"Reenviar link":"Enviar endereço de acesso"}</button>${a.perfil?`<button type="button" class="btn ghost" data-act="editar-usuario" data-id="${a.perfil.id}">O que ele pode ver</button>`:""}</div></div>`; }
+  }
   return cab(m.id?esc(c.nome):"Novo cliente") + `<form class="sheet-b" autocomplete="off"><div class="grid2">
     <label class="f span2">Nome<input type="text" id="c-nome" value="${esc(c.nome||"")}" ${ed?"":"disabled"}></label>
     <label class="f">Tipo<select id="c-tipo" ${ed?"":"disabled"}>${opts([["PF","Pessoa física"],["PJ","Pessoa jurídica"]], c.tipo)}</select></label>
@@ -2012,7 +2241,7 @@ function leitorProc(){ const s = $("#lt-proc"); if(s && s.value) modal.processo_
 /* ---------- modais ---------- */
 function abrirModal(m){
   modal = m;
-  const fn = {tarefa:mTarefa, processo:mProcesso, detalhe:mDetalhe, cliente:mCliente, perfil:mPerfil, mais:mMais, usuario:mUsuario, comunicar:mComunicar, leitor:mLeitor, com:mCom, aparencia:mAparencia, convite:mConvite, novaSenha:mNovaSenha, docgerado:mDocGerado, modelo:mModelo, financeiro:mFinanceiro, atendimento:mAtendimento, agendaCelular:mAgendaCelular}[m.kind];
+  const fn = {tarefa:mTarefa, processo:mProcesso, detalhe:mDetalhe, cliente:mCliente, perfil:mPerfil, mais:mMais, usuario:mUsuario, comunicar:mComunicar, leitor:mLeitor, com:mCom, aparencia:mAparencia, convite:mConvite, novaSenha:mNovaSenha, docgerado:mDocGerado, modelo:mModelo, financeiro:mFinanceiro, atendimento:mAtendimento, agendaCelular:mAgendaCelular, acessoCliente:mAcessoCliente, novoModelo:mNovoModelo, gerarModelo:mGerarModelo}[m.kind];
   const sheet = $("#sheet");
   sheet.className = "sheet" + (["detalhe","leitor"].includes(m.kind)?" wide":"") + (m.kind==="docgerado"?" wide docview":"");
   sheet.innerHTML = fn(m);
@@ -2150,10 +2379,10 @@ function mDetalhe(m){
   if(aba==="prazos") corpo = `<div class="row" style="justify-content:flex-end">${pode("criar_tarefas")?`<button class="btn" data-act="nova-tarefa" data-tipo="Audiência" data-proc="${p.id}">${ICON.plus}Audiência</button><button class="btn" data-act="nova-tarefa" data-tipo="Peça" data-proc="${p.id}">${ICON.plus}Tarefa</button>`:""}<button class="btn primary" data-act="nova-tarefa" data-tipo="${pode("criar_tarefas")?"Prazo":"Peça"}" data-proc="${p.id}">${ICON.plus}${pode("criar_tarefas")?"Prazo":"Atividade"}</button></div>
     <div class="panel"><div class="pauta">${ts.length?ts.map(itemTarefa).join(""):`<div class="empty small">Nenhum compromisso neste processo.</div>`}</div></div>`;
   if(aba==="andamentos") corpo = `${podeReg?`<div class="calc dj-box">${blocoDataJud(p)}</div>`:""}${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="date" id="and-data" value="${hoje()}" style="width:auto"><input type="text" id="and-txt" placeholder="Ex.: Juntada de contestação"><button class="btn primary" data-act="add-andamento" data-id="${p.id}">Incluir</button></div>
-      <label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label></div>`:""}
-    ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span>${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</div><div>${esc(a.texto)}</div>${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button><button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
+      <div class="row" style="justify-content:space-between;gap:8px"><label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label><label class="btn ghost small-btn" style="cursor:pointer">${ICON.plus}<span id="and-arq-n">Anexar documento</span><input type="file" id="and-arq" hidden accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label></div></div>`:""}
+    ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span>${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</div><div>${esc(a.texto)}</div>${a.arquivo?`<button class="anexo" data-act="ver-arquivo" data-c="${esc(a.arquivo)}">${ICON.pdf}<span>${esc(a.arquivo_nome||"Documento anexo")}</span></button>`:""}${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button>${podeReg?`<label class="linkbtn small" style="cursor:pointer">${a.arquivo?"Trocar anexo":"Anexar documento"}<input type="file" hidden data-file="and-anexo" data-id="${a.id}" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label>`:""}<button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
   if(aba==="documentos") corpo = `${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="text" id="doc-nome" placeholder="Ex.: Procuração, CTPS, contrato"><button class="btn primary" data-act="add-doc" data-id="${p.id}">Incluir</button></div><label class="check"><input type="checkbox" id="doc-vis" checked> Visível para o cliente (ele vê que o documento é necessário)</label></div>`:""}
-    <div class="doclist">${docs.length?docs.map(d=>`<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}${d.status==="Enviado pelo cliente"?` <span class="chip warn">novo</span>`:""}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}${d.arquivo?` · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.arquivo)}">Ver arquivo</button>`:""}</div></div><select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`).join(""):`<span class="small muted">Nenhum documento listado.</span>`}</div>`;
+    <div class="doclist">${docs.length?docs.map(d=>`<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}${d.status==="Enviado pelo cliente"?` <span class="chip warn">novo</span>`:""}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}${d.arquivo?` · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.arquivo)}">Ver arquivo</button>`:""}${podeReg?` · <label class="linkbtn small" style="cursor:pointer">${d.arquivo?"Trocar arquivo":"Anexar arquivo"}<input type="file" hidden data-file="doc-anexo" data-id="${d.id}" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label>`:""}</div></div><select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`).join(""):`<span class="small muted">Nenhum documento listado.</span>`}</div>`;
   if(aba==="envios") corpo = coms.length?`<div class="timeline">${coms.map(c=>`<div class="ev"><div class="small muted">${new Date(c.enviado_em||c.criado_em).toLocaleString("pt-BR")} · ${esc(nomePerfil(c.enviado_por||c.criado_por))}</div><div class="pre" style="max-height:140px;margin-top:4px">${esc(c.texto||"")}</div></div>`).join("")}</div>`:`<span class="small muted">Nenhuma mensagem preparada para este processo.</span>`;
   return cab(`<span class="mono" style="font-size:1.05rem">${esc(p.numero||"Processo sem número")}</span>`, `${chipArea(p.area)} <span class="chip neutral">${esc(p.fase||"")}</span> ${info.completo?esc(info.segmento):""}`) + `<div class="sheet-b">
     <div class="row">${pode("enviar_cliente")?`<button class="btn primary" data-act="comunicar" data-id="${p.id}">${ICON.send}Mensagem ao cliente</button>`:""}${podeReg?`<button class="btn" data-act="ler-pdf" data-proc="${p.id}">${ICON.scan}Ler PDF</button>`:""}${pode("gerar_relatorios")?`<button class="btn" data-act="pdf-processo" data-id="${p.id}">${ICON.pdf}PDF</button>`:""}${pode("editar_processos")?`<button class="btn ghost" data-act="editar-processo" data-id="${p.id}">Editar</button>`:""}</div>
@@ -2229,6 +2458,8 @@ document.addEventListener("click", async e => {
   if(el.tagName==="SELECT" || (el.tagName==="INPUT" && el.type!=="checkbox")) return;
   if(el.tagName==="A") return;
   if(/^(fin-|at-|dj-|agenda-)|^(calc-aba|calc-atual|calc-resc|ver-arquivo|pdf-carteira-direto|doc-financeiro)$/.test(a) && await acaoV3(a, el)) return;
+  if(/^(cfg-|mdx-)/.test(a) && a!=="cfg-ir-modelos" && await acaoConfig(a, el)) return;
+  if(a==="cfg-ir-modelos"){ CFG.aba = "modelos"; abrirAba("config"); return; }
   if(/^(pc-|doc-|radar-)|^copiar-txt-el$/.test(a) && await acaoPecas(a, el)) return;
   switch(a){
     /* tela inicial */
@@ -2255,9 +2486,9 @@ document.addEventListener("click", async e => {
     /* aparência */
     case "aparencia": abrirModal({kind:"aparencia"}); break;
     case "tema": modal.t[el.dataset.k] = el.dataset.v; P.aplicarTema(modal.t); abrirModal(modal); break;
-    case "tema-padrao": modal.t = Object.assign({}, P.TEMA_PADRAO, (S.escritorio?.config||{}).tema||{}); P.aplicarTema(modal.t); abrirModal(modal); break;
+    case "tema-padrao": modal.t = Object.assign({}, P.TEMA_PADRAO, (S.escritorio?.config||{}).tema_v2||{}); P.aplicarTema(modal.t); abrirModal(modal); break;
     case "tema-salvar": P.salvarTemaLocal(modal.t); api.salvarPrefs({tema:modal.t}); fecharModal(); toast("Aparência salva"); break;
-    case "tema-escritorio": await comErro(async()=>{ const cfg = Object.assign({}, P.cfg(), {tema:modal.t}); S.escritorio = await api.atualizarEscritorio("escritorio", {nome:S.escritorio?.nome||"", config:cfg}); P.escritorio = S.escritorio; P.salvarTemaLocal(modal.t); fecharModal(); toast("Aparência definida como padrão do escritório"); }); break;
+    case "tema-escritorio": await comErro(async()=>{ const cfg = Object.assign({}, P.cfg(), {tema_v2:modal.t}); S.escritorio = await api.atualizarEscritorio("escritorio", {nome:S.escritorio?.nome||"", config:cfg}); P.escritorio = S.escritorio; P.salvarTemaLocal(modal.t); fecharModal(); toast("Aparência definida como padrão do escritório"); }); break;
     /* navegação */
     case "nav": abrirAba(el.dataset.v); break;
     case "mais": abrirModal({kind:"mais"}); break;
@@ -2282,7 +2513,11 @@ document.addEventListener("click", async e => {
     case "editar-processo": abrirModal({kind:"processo", id}); break;
     case "abrir-processo": e.stopPropagation(); abrirModal({kind:"detalhe", id, vivo:true}); break;
     case "salvar-processo": salvarProcesso(); break;
-    case "add-andamento": { const txt = $("#and-txt").value.trim(); if(!txt) return; await comErro(async()=>{ await api.inserir("andamentos", {processo_id:id, data:$("#and-data").value||hoje(), texto:txt, visivel_cliente:$("#and-vis").checked}); agendarRecarga("andamentos"); toast("Andamento registrado"); }); break; }
+    case "add-andamento": { const txt = $("#and-txt").value.trim(); if(!txt){ toast("Escreva o andamento."); $("#and-txt").focus(); return; } const f = $("#and-arq")?.files?.[0];
+      if(f && f.size > 10*1024*1024){ toast("Arquivo maior que 10 MB."); return; }
+      el.disabled = true; await comErro(async()=>{ const row = {processo_id:id, data:$("#and-data").value||hoje(), texto:txt, visivel_cliente:$("#and-vis").checked};
+        if(f){ toast("Enviando o documento…"); row.arquivo = await api.enviarArquivo(caminhoProcesso(id, f.name), f); row.arquivo_nome = f.name; }
+        await api.inserir("andamentos", row); agendarRecarga("andamentos"); toast(f ? "Andamento e documento registrados" : "Andamento registrado"); }); el.disabled = false; break; }
     case "and-vis": { const x = S.andamentos.find(y=>y.id===id); await comErro(async()=>{ await api.atualizar("andamentos", id, {visivel_cliente:!x.visivel_cliente}); agendarRecarga("andamentos"); }); break; }
     case "del-and": await comErro(async()=>{ await api.excluir("andamentos", id); agendarRecarga("andamentos"); }); break;
     case "add-doc": { const nome = $("#doc-nome").value.trim(); if(!nome) return; await comErro(async()=>{ await api.inserir("documentos", {processo_id:id, nome, status:"Aguardando cliente", data:hoje(), visivel_cliente:$("#doc-vis").checked}); agendarRecarga("documentos"); }); break; }
@@ -2294,7 +2529,14 @@ document.addEventListener("click", async e => {
     case "novo-cliente": abrirModal({kind:"cliente"}); break;
     case "editar-cliente": abrirModal({kind:"cliente", id}); break;
     case "salvar-cliente": { const v = i => document.getElementById(i)?.value?.trim() ?? ""; const row = {nome:v("c-nome"), tipo:v("c-tipo"), doc:v("c-doc"), telefone:v("c-tel"), email:v("c-email"), obs:v("c-obs"), dados:Object.assign({}, (modal.c||{}).dados||{}, {nacionalidade:v("c-nac"), estado_civil:v("c-ec"), profissao:v("c-prof"), rg:v("c-rg"), endereco:v("c-end"), representante:v("c-rep")})}; if(!row.nome){ toast("Informe o nome."); return; }
-      await comErro(async()=>{ if(modal.id) await api.atualizar("clientes", modal.id, row); else await api.inserir("clientes", row); fecharModal(); toast("Cliente salvo"); agendarRecarga("clientes"); }); break; }
+      const darAcesso = !modal.id && $("#c-portal")?.checked;
+      await comErro(async()=>{ let novo = null; if(modal.id) await api.atualizar("clientes", modal.id, row); else novo = await api.inserir("clientes", row);
+        fecharModal(); toast("Cliente salvo"); agendarRecarga("clientes");
+        if(darAcesso && novo && novo.id){ if(!S.clientes.some(x=>x.id===novo.id)) S.clientes.push(novo); if(!(RAW.clientes||[]).some(x=>x.id===novo.id)) (RAW.clientes = RAW.clientes||[]).push(novo); await liberarAcessoCliente(novo.id); } }); break; }
+    case "ac-liberar": await liberarAcessoCliente(id); break;
+    case "copiar-ac-msg": P.copiar($("#ac-msg")?.value||""); break;
+    case "ac-cancelar": await comErro(async()=>{ await api.excluir("convites", id); S.convites = (S.convites||[]).filter(x=>x.id!==id); agendarRecarga("convites"); abrirModal(modal); toast("Link cancelado"); }); break;
+    case "ac-bloquear": { const u = S.perfis.find(x=>x.id===id); if(!u) break; await comErro(async()=>{ await api.atualizar("perfis", id, {status:u.status==="ativo"?"bloqueado":"ativo"}); u.status = u.status==="ativo"?"bloqueado":"ativo"; agendarRecarga("perfis"); abrirModal(modal); toast(u.status==="ativo"?"Acesso liberado":"Acesso bloqueado"); }); break; }
     case "vincular": { const c = modal.c, pid = el.dataset.pid; const outro = (RAW.clientes||[]).find(x=>x.conta_id===pid && x.id!==c.id); if(outro){ toast(`Esta conta já está vinculada a ${outro.nome}.`); return; }
       await comErro(async()=>{ await api.atualizar("clientes", c.id, {conta_id:pid, conta_nome:el.dataset.nome, conta_email:el.dataset.email}); agendarRecarga("clientes"); toast("Conta vinculada. O portal do cliente foi publicado."); fecharModal(); }); break; }
     case "desvincular": { if(!confirmar(el, "desv"+id, "Confirmar")) return; const c = cliById(id); await comErro(async()=>{ if(c.conta_id) await api.removerPortal(c.conta_id); await api.atualizar("clientes", id, {conta_id:null, conta_nome:null, conta_email:null}); agendarRecarga("clientes"); fecharModal(); toast("Conta desvinculada"); }); break; }
@@ -2302,7 +2544,7 @@ document.addEventListener("click", async e => {
     case "sync-portais": sincronizarTodos(); toast("Portais atualizados"); break;
     /* equipe */
     case "novo-convite": abrirModal({kind:"convite"}); break;
-    case "convite-cliente": { const c = cliById(id); abrirModal({kind:"convite", pre:{nome:c.nome, email:c.email||"", papel:"cliente", cliente_id:id, dias:0, permissoes:Object.assign({}, P.PADRAO.cliente)}}); break; }
+    case "convite-cliente": { await liberarAcessoCliente(id); break; const c = cliById(id); abrirModal({kind:"convite", pre:{nome:c.nome, email:c.email||"", papel:"cliente", cliente_id:id, dias:0, permissoes:Object.assign({}, P.PADRAO.cliente)}}); break; }
     case "convite-padrao": lerConviteForm(); modal.c.permissoes = Object.assign({}, P.PADRAO[modal.c.papel]); abrirModal(modal); break;
     case "salvar-convite": { const c = lerConviteForm(); if(!c.nome){ toast("Informe o nome da pessoa."); return; } if(c.papel==="cliente" && !c.cliente_id){ toast("Escolha o cliente."); return; }
       el.disabled = true;
@@ -2418,14 +2660,18 @@ document.addEventListener("submit", async e => {
   }
   if(e.target.id==="f-escritorio"){
     const dv = id => ($("#"+id)?.value||"").trim(), dAnt = P.cfg().docs || {};
-    const docs = {nome:dv("d-nome"), cnpj:dv("d-cnpj"), oab:dv("d-oab"), cidade:dv("d-cidade"), endereco:dv("d-end"), telefone:dv("d-tel"), email:dv("d-email"), advogados:$("#d-advs")?.value||"", cor:dv("d-cor"), cor2:dv("d-cor2"), logo:LOGO_TMP ?? dAnt.logo ?? ""};
-    const cfg = Object.assign({}, P.cfg(), {margem:Number($("#a-margem").value||2), feriadosLocais:$("#a-fer").value, docs});
-    await comErro(async()=>{ S.escritorio = await api.atualizarEscritorio("escritorio", {nome:$("#a-nome").value.trim()||S.escritorio?.nome||"", config:cfg}); P.escritorio = S.escritorio; toast("Ajustes salvos"); render(); sincronizarTodos(); });
+    const docs = Object.assign({}, dAnt);
+    [["nome","d-nome"],["cnpj","d-cnpj"],["oab","d-oab"],["cidade","d-cidade"],["endereco","d-end"],["telefone","d-tel"],["email","d-email"],["cor","d-cor"],["cor2","d-cor2"]].forEach(([k,i])=>{ if($("#"+i)) docs[k] = dv(i); });
+    if($("#d-advs")) docs.advogados = $("#d-advs").value; if(LOGO_TMP!==null) docs.logo = LOGO_TMP;
+    const cfg = Object.assign({}, P.cfg(), {margem:Number($("#a-margem")?.value||P.cfg().margem||2), feriadosLocais:$("#a-fer") ? $("#a-fer").value : (P.cfg().feriadosLocais||""), docs});
+    await comErro(async()=>{ S.escritorio = await api.atualizarEscritorio("escritorio", {nome:$("#a-nome")?.value.trim()||S.escritorio?.nome||"", config:cfg}); P.escritorio = S.escritorio; LOGO_TMP = null; toast("Configurações salvas"); const on = $("#office-name"); if(on) on.textContent = S.escritorio.nome||""; render(); sincronizarTodos(); });
   }
 });
 document.addEventListener("input", e => {
   const el = e.target, b = el.dataset.bind;
   if(b){ if(b==="busca"){ busca = el.value; render(); return; } const [o,k] = b.split("."); ({M,L,CH,DG,DGA,PC,FIN,CALC})[o][k] = el.value; return; }
+  if(el.dataset.lay){ CFG.lay = Object.assign({}, CFG.lay||{}, {[el.dataset.lay]:el.value}); clearTimeout(CFG.t); CFG.t = setTimeout(()=>{ const f = $("#lay-prev"); if(f) f.srcdoc = exemploDoc(layoutAtual()); }, 150); return; }
+  if(el.dataset.mdxv){ el.classList.toggle("vazio", !el.value.trim()); return; }
   if(el.id==="dg-busca"){ DG.termo = el.value; const l = $("#dg-lista"); if(l) l.innerHTML = listaTemas(); return; }
   if(el.dataset.calc && el.type!=="checkbox"){ L.calc[el.dataset.calc] = el.value; const pos = el.selectionStart; const idEl = el.id; mostrarInicio(); const n = document.getElementById(idEl); if(n && n.type!=="date"){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(_){} } return; }
   if(el.id==="cnj-in"){ L.cnj = P.mascaraCNJ(el.value); mostrarInicio(); const n = $("#cnj-in"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); return; }
@@ -2436,13 +2682,23 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", async e => {
   const el = e.target;
+  if(el.dataset.file==="modelo-docx"){ await receberModeloDocx(el.files[0]); el.value = ""; return; }
+  if(el.dataset.mdx && modal && modal.kind==="gerarModelo"){ lerValoresMdx(); const auto = Object.keys(P.valoresModelo({}));
+    modal[el.dataset.mdx] = el.value; if(el.dataset.mdx==="cliente_id"){ const p = procById(modal.processo_id); if(p && p.cliente_id!==el.value) modal.processo_id = ""; }
+    if(el.dataset.mdx==="processo_id" && el.value && !modal.cliente_id){ modal.cliente_id = procById(el.value)?.cliente_id || ""; }
+    modal.vals = Object.fromEntries(Object.entries(modal.vals||{}).filter(([k])=>!auto.includes(k))); modal.prev = false; abrirModal(modal); return; }
+  if(el.id==="and-arq"){ const n = $("#and-arq-n"); if(n) n.textContent = el.files[0] ? "📎 "+el.files[0].name.slice(0,28) : "Anexar documento"; return; }
+  if(el.dataset.file==="and-anexo" || el.dataset.file==="doc-anexo"){ const f = el.files[0]; if(!f) return; if(f.size > 10*1024*1024){ toast("Arquivo maior que 10 MB."); el.value=""; return; }
+    const col = el.dataset.file==="and-anexo" ? "andamentos" : "documentos"; toast("Enviando…");
+    await comErro(async()=>{ const c = await api.enviarArquivo(caminhoProcesso(el.dataset.proc, f.name), f); await api.atualizar(col, el.dataset.id, col==="andamentos" ? {arquivo:c, arquivo_nome:f.name} : {arquivo:c}); agendarRecarga(col); toast("Documento anexado"); });
+    el.value = ""; return; }
   if(el.dataset.file && el.dataset.file.startsWith("portal")){ await enviarPortal(el.dataset.file, el.files[0], el); el.value = ""; return; }
   if(el.dataset.file){ await receberArquivo(el.dataset.file, el.files[0], el.dataset.proc); el.value = ""; return; }
   if(el.dataset.act==="at-status"){ await comErro(async()=>{ await api.atualizar("atendimentos", el.dataset.id, {status:el.value}); await recarregar("atendimentos", true); render(); }); return; }
   if(el.dataset.bind && el.dataset.re && el.tagName==="INPUT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,DGA,PC,FIN,CALC})[o][k] = el.value; pcMudou(el.dataset.re); return; }
   if(el.dataset.calc){ L.calc[el.dataset.calc] = el.type==="checkbox" ? el.checked : el.value; mostrarInicio(); return; }
   if(el.dataset.bind && el.tagName==="SELECT"){ const [o,k] = el.dataset.bind.split("."); ({M,L,CH,DG,DGA,PC,FIN,CALC})[o][k] = el.value; if(el.dataset.re) pcMudou(el.dataset.re); return; }
-  if(el.id==="a-logo" && el.files[0]){ const f = el.files[0]; const img = new Image(); img.onload = ()=>{ const r = Math.min(1, 420/img.width, 140/img.height); const c = document.createElement("canvas"); c.width = Math.round(img.width*r); c.height = Math.round(img.height*r); c.getContext("2d").drawImage(img,0,0,c.width,c.height); LOGO_TMP = c.toDataURL("image/png"); const pv = $("#a-logo-prev"); if(pv){ pv.src = LOGO_TMP; pv.hidden = false; } URL.revokeObjectURL(img.src); }; img.src = URL.createObjectURL(f); return; }
+  if(el.id==="a-logo" && el.files[0]){ const f = el.files[0]; const img = new Image(); img.onload = ()=>{ const r = Math.min(1, 420/img.width, 140/img.height); const c = document.createElement("canvas"); c.width = Math.round(img.width*r); c.height = Math.round(img.height*r); c.getContext("2d").drawImage(img,0,0,c.width,c.height); LOGO_TMP = c.toDataURL("image/png"); const pv = $("#a-logo-prev"); if(pv){ pv.src = LOGO_TMP; pv.hidden = false; } const vz = $("#a-logo-vazio"); if(vz) vz.remove(); toast("Logo carregado. Clique em Salvar configurações."); URL.revokeObjectURL(img.src); }; img.src = URL.createObjectURL(f); return; }
   if(el.id==="daily-dia"){ D.dia = el.value; render(); return; }
   if(el.id==="l-papel"){ L.papelPedido = el.value; return; }
   if(el.dataset.act==="doc-status"){ await comErro(async()=>{ await api.atualizar("documentos", el.dataset.id, {status:el.value}); agendarRecarga("documentos"); }); return; }
