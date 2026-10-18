@@ -1194,15 +1194,18 @@ document.addEventListener("submit", async e => {
   e.preventDefault();
   const fid = e.target.id;
   if(["f-login","f-criar","f-recuperar","f-convite"].includes(fid)){
-    const v = i => (document.getElementById(i)?.value || "").trim();
-    L.enviando = true; L.erroForm = ""; L.msg = ""; mostrarInicio();
+    const fd = {}; e.target.querySelectorAll("input").forEach(x=>{ if(x.id) fd[x.id] = x.value; });
+    const v = i => (fd[i] || "").trim();
+    const senha = i => fd[i] || "";
+    const repor = () => Object.entries(fd).forEach(([k,val])=>{ const x = document.getElementById(k); if(x && !x.readOnly) x.value = val; });
+    L.enviando = true; L.erroForm = ""; L.msg = ""; mostrarInicio(); repor();
     try{
-      if(fid==="f-login"){ L.emailDigitado = v("lg-email"); await api.entrar(v("lg-email"), e.target.querySelector("#lg-senha")?.value || ""); }
-      if(fid==="f-criar"){ const r = await api.criarEscritorio({escritorio:v("cr-esc"), nome:v("cr-nome"), email:v("cr-email"), senha:document.getElementById("cr-senha").value}); if(r.confirmar){ L.enviando = false; L.tela = "entrar"; L.msg = "Escritório criado. Confirme o e-mail pelo link que enviamos e depois entre."; mostrarInicio(); return; } }
-      if(fid==="f-convite"){ const r = await api.aceitarConvite({token:L.token, nome:v("cv-nome"), email:v("cv-email"), telefone:v("cv-tel"), senha:document.getElementById("cv-senha").value}); if(r.confirmar){ L.enviando = false; L.tela = "entrar-convite"; L.msg = "Acesso criado. Confirme o e-mail pelo link que enviamos e depois entre."; mostrarInicio(); return; } }
+      if(fid==="f-login"){ L.emailDigitado = v("lg-email"); await api.entrar(v("lg-email"), senha("lg-senha")); }
+      if(fid==="f-criar"){ const r = await api.criarEscritorio({escritorio:v("cr-esc"), nome:v("cr-nome"), email:v("cr-email"), senha:senha("cr-senha")}); if(r.confirmar){ L.enviando = false; L.tela = "entrar"; L.msg = "Escritório criado. Confirme o e-mail pelo link que enviamos e depois entre."; mostrarInicio(); return; } }
+      if(fid==="f-convite"){ const r = await api.aceitarConvite({token:L.token, nome:v("cv-nome"), email:v("cv-email"), telefone:v("cv-tel"), senha:senha("cv-senha")}); if(r.confirmar){ L.enviando = false; L.tela = "entrar-convite"; L.msg = "Acesso criado. Confirme o e-mail pelo link que enviamos e depois entre."; mostrarInicio(); return; } }
       if(fid==="f-recuperar"){ await api.recuperar(v("rc-email")); L.enviando = false; L.msg = "Se o e-mail estiver cadastrado, o link chega em instantes."; mostrarInicio(); return; }
       L.enviando = false; await identificar(); if(S.perfil) await entrarNoApp();
-    }catch(err){ L.enviando = false; L.erroForm = P.erroAmigavel(err); mostrarInicio(); }
+    }catch(err){ L.enviando = false; L.erroForm = P.erroAmigavel(err); mostrarInicio(); repor(); }
     return;
   }
   if(e.target.id==="f-escritorio"){

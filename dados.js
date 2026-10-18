@@ -9,6 +9,7 @@ const base = () => location.origin + location.pathname;
 
 P.erroAmigavel = function(e){
   const m = (e && (e.message || e.error_description || e.msg)) || String(e||"");
+  if(/Anonymous sign-ins/i.test(m)) return "Preencha o e-mail e a senha.";
   if(/Invalid login credentials/i.test(m)) return "E-mail ou senha incorretos.";
   if(/Email not confirmed/i.test(m)) return "Confirme seu e-mail pelo link que enviamos antes de entrar.";
   if(/User already registered|already been registered/i.test(m)) return "Este e-mail já tem conta. Use Entrar ou Esqueci a senha.";
