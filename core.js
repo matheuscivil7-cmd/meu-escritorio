@@ -1,4 +1,4 @@
-/* Pauta Jurídica · núcleo: domínio, prazos, leitura de arquivos e geração de PDF */
+/* Meu Escritório · núcleo: domínio, prazos, leitura de arquivos e geração de PDF */
 (function(){
 "use strict";
 const P = window.Pauta = window.Pauta || {};
@@ -7,8 +7,34 @@ const P = window.Pauta = window.Pauta || {};
 P.AREAS = {
   trabalhista:{nome:"Trabalhista", contagem:"uteis", lei:"CLT", cor:"trab"},
   civel:{nome:"Cível", contagem:"uteis", lei:"CPC", cor:"civ"},
-  criminal:{nome:"Criminal", contagem:"corridos", lei:"CPP", cor:"crim"}
+  criminal:{nome:"Criminal", contagem:"corridos", lei:"CPP", cor:"crim"},
+  familia:{nome:"Família e sucessões", contagem:"uteis", lei:"CPC", cor:"fam"},
+  consumidor:{nome:"Consumidor", contagem:"uteis", lei:"CPC / CDC", cor:"cons"},
+  empresarial:{nome:"Empresarial", contagem:"uteis", lei:"CPC", cor:"emp"},
+  tributario:{nome:"Tributário", contagem:"uteis", lei:"CPC / CTN", cor:"trib"},
+  administrativo:{nome:"Administrativo", contagem:"uteis", lei:"CPC", cor:"adm"},
+  constitucional:{nome:"Constitucional", contagem:"uteis", lei:"CPC / RISTF", cor:"const"},
+  previdenciario:{nome:"Previdenciário", contagem:"uteis", lei:"CPC / Lei 8.213", cor:"prev"},
+  ambiental:{nome:"Ambiental", contagem:"uteis", lei:"CPC", cor:"amb"},
+  digital:{nome:"Digital e LGPD", contagem:"uteis", lei:"CPC", cor:"dig"},
+  compliance:{nome:"Compliance", contagem:"uteis", lei:"CPC", cor:"comp"}
 };
+P.AREA_RE = [
+  ["trabalhista", /trabalh|reclamat|\bclt\b|\btrt\b|\btst\b|emprega|demiss|rescis|fgts|verbas rescis|horas? extras?/],
+  ["criminal", /crimin|penal|\bcrime|inquerito|denuncia|prisao|flagrante|habeas corpus|delegacia/],
+  ["familia", /famil|divorci|pensao alimenticia|\balimentos\b|guarda d|inventario|heranca|uniao estavel|sucesso|partilha/],
+  ["previdenciario", /previd|\binss\b|aposentad|\bbpc\b|\bloas\b|auxilio doenca|beneficio por incapacidade|pensao por morte/],
+  ["tributario", /tribut|imposto|\bicms\b|\biss\b|\birpf?\b|\bfisco\b|execucao fiscal|receita federal|\bcarf\b|reforma tributaria/],
+  ["consumidor", /consumidor|\bcdc\b|procon|plano de saude|companhia aerea|negativa(cao|do)|serasa/],
+  ["administrativo", /administrativ|licita|servidor publico|concurso publico|improbidade|tcu\b|tribunal de contas/],
+  ["constitucional", /constitucion|\badi\b|\badc\b|\badpf\b|repercussao geral/],
+  ["empresarial", /empresari|societari|falenc|recuperacao judicial|contrato social|\bsocios?\b|startup|m&a/],
+  ["ambiental", /ambient|\bibama\b|licenciamento|desmatamento|poluica|clima/],
+  ["digital", /\blgpd\b|dados pessoais|\banpd\b|digital|internet|vazamento de dados|ciber|inteligencia artificial|redes sociais/],
+  ["compliance", /compliance|anticorrup|integridade|leniencia|lavagem de dinheiro/],
+  ["civel", /civel|\bcivil\b|cobranca|indeniza|contrato|despejo|locacao|usucapiao|dano moral/]
+];
+P.areaDoTexto = txt => { const n = String(txt||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); const r = P.AREA_RE.find(([,re])=>re.test(n)); return r ? r[0] : ""; };
 P.FASES = ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento","Acordo","Suspenso","Arquivado"];
 P.TIPOS = ["Prazo","Audiência","Peça","Diligência","Reunião"];
 P.DOC_STATUS = ["Rascunho","Aguardando cliente","Enviado pelo cliente","Recebido","Assinado","Protocolado"];
@@ -38,6 +64,9 @@ P.PADRAO = {
 P.PRAZOS_COMUNS = {
   civel:[["Contestação",15],["Réplica",15],["Apelação",15],["Contrarrazões",15],["Agravo de instrumento",15],["Embargos de declaração",5],["Recurso especial",15],["Manifestação (prazo genérico)",5]],
   trabalhista:[["Recurso ordinário",8],["Contrarrazões",8],["Recurso de revista",8],["Agravo de petição",8],["Embargos de declaração",5],["Embargos à execução",5],["Manifestação sobre documentos",5]],
+  tributario:[["Contestação",15],["Embargos à execução fiscal",30],["Apelação",15],["Agravo de instrumento",15],["Embargos de declaração",5],["Impugnação administrativa (CARF/estadual)",30],["Mandado de segurança (decadência)",120]],
+  previdenciario:[["Contestação",15],["Recurso inominado (JEF)",10],["Apelação",15],["Recurso administrativo (INSS)",30],["Embargos de declaração",5]],
+  consumidor:[["Contestação",15],["Recurso inominado (JEC)",10],["Apelação",15],["Embargos de declaração",5],["Réplica",15]],
   criminal:[["Resposta à acusação",10],["Apelação (interposição)",5],["Razões de apelação",8],["Recurso em sentido estrito",5],["Embargos de declaração",2],["Memoriais",5],["Recurso especial",15]]
 };
 P.SEGMENTOS = {"1":"STF","2":"CNJ","3":"STJ","4":"Justiça Federal","5":"Justiça do Trabalho","6":"Justiça Eleitoral","7":"Justiça Militar da União","8":"Justiça Estadual","9":"Justiça Militar Estadual"};

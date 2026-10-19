@@ -72,7 +72,7 @@ P.criarSupabase = function(url, chave){
     async pedidos(){ return []; },
     async convites(){ return ok(await sb.from("convites").select("*").order("criado_em", {ascending:false})) || []; },
     async daily(){ const {data, error} = await sb.functions.invoke("noticias", {body:{}}); if(error) throw error; return data && data.itens ? [edicao(data)] : []; },
-    async radar(tema){ const url = "https://news.google.com/rss/search?q=" + encodeURIComponent(tema) + "+when:7d&hl=pt-BR&gl=BR&ceid=BR:pt-419"; const {data, error} = await sb.functions.invoke("noticias", {body:{fontes:[{fonte:"Radar", area:"tribunais", url}]}}); if(error) throw error; return ((data && data.itens) || []).slice(0, 8).map(i=>({titulo:i.titulo, link:i.link, fonte:i.fonte, data:i.data})); },
+    async radar(tema){ const {data, error} = await sb.functions.invoke("noticias", {body:{radar:tema}}); if(error) throw error; return ((data && data.itens) || []).slice(0, 8).map(i=>({titulo:i.titulo, link:i.link, fonte:i.fonte, data:i.data, imagem:i.imagem||"", area:(i.areas||[]).find(a=>a!=="tribunais")||""})); },
     async prefs(){ return null; }, async salvarPrefs(){},
     async servico(acao, dados){ const {data, error} = await sb.functions.invoke("servicos", {body:Object.assign({acao}, dados||{})}); if(error) throw error; return data; },
     async rpc(nome, args){ return ok(await sb.rpc(nome, args||{})); },
@@ -164,6 +164,7 @@ P.criarDemo = function(){
       {titulo:"Exemplo: decisão sobre direito do consumidor", resumo:"Cada notícia mostra a fonte e abre a matéria original.", fonte:"Demonstração", link:"", area:"civel", areas:["civel"]}]}]; },
     async prefs(){ return null; }, async salvarPrefs(){},
     async servico(acao, d){
+      if(acao==="datajud" && P.soDigitos(d.numero)[13]==="1") return {tribunal:"STF", encontrado:false, foraDataJud:true, movimentos:[], aviso:"O STF não publica os processos na base pública do CNJ (DataJud). Consulte direto no portal do STF."};
       if(acao==="datajud") return {tribunal:"TRT2", encontrado:true, classe:"Ação Trabalhista - Rito Ordinário", orgao:"4ª Vara do Trabalho de Osasco", assuntos:["Horas Extras"], movimentos:[{data:new Date().toISOString(), nome:"Juntada de Petição", detalhe:"Manifestação"},{data:P.addDays(new Date(),-9).toISOString(), nome:"Audiência designada", detalhe:"instrução"},{data:P.addDays(new Date(),-40).toISOString(), nome:"Distribuído por sorteio", detalhe:""}]};
       if(acao==="jurisprudencia") return {fonte:"TJSP (demonstração)", termo:d.q, pagina:d.pagina||1, total:2, itens:[
         {numero:"1000592-29.2025.8.26.0106", classe:"Apelação Cível / Transporte Aéreo", relator:"Relator de exemplo", comarca:"São Paulo", orgao:"16ª Câmara de Direito Privado", julgamento:"15/10/2026", publicacao:"16/10/2026", ementa:"Ementa: APELAÇÃO CÍVEL – Exemplo de acórdão. Com o Supabase configurado, aqui aparecem os acórdãos reais do TJSP.", link:""},

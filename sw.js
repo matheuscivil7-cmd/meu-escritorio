@@ -1,5 +1,5 @@
 /* Meu Escritório · permite instalar como app. Os dados sempre vêm do servidor. */
-const VERSAO = "pauta-v13";
+const VERSAO = "pauta-v14";
 const ARQUIVOS = ["./", "index.html", "app.css", "core.js", "dados.js", "ia.js", "direito.js", "pecas.js", "app.js", "config.js", "manifest.webmanifest", "icon-192.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSAO).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
