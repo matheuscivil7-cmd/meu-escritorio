@@ -574,10 +574,11 @@ function vClientes(){
   return `<div class="head"><div><h1>Clientes</h1><div class="sub">${S.clientes.length} cliente(s). Ao cadastrar, o app já cria o link para o cliente acompanhar os processos pelo portal.</div></div>${pode("gerenciar_clientes")?`<button class="btn primary" data-act="novo-cliente">${ICON.plus}Novo cliente</button>`:""}</div>
   <div class="search">${ICON.search}<input type="search" id="busca" placeholder="Buscar cliente" value="${esc(busca)}" data-bind="busca"></div>
   <div class="panel">${!S.clientes.length?`<div class="empty"><h2>Nenhum cliente ainda</h2><p>Clientes também podem ser criados direto no cadastro do processo.</p></div>`:`
-  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Contato</th><th>Processos</th><th>Acesso ao portal</th></tr></thead><tbody>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Contato</th><th>Processos</th>${pode("financeiro")?"<th>Honorários</th>":""}<th>Acesso ao portal</th></tr></thead><tbody>
   ${cs.map(c=>{ const ps = S.processos.filter(p=>p.cliente_id===c.id); const ac = acessoCliente(c.id), [acl, ast] = CHIP_ACESSO[ac.estado], gere = pode("gerenciar_equipe");
     return `<tr data-act="editar-cliente" data-id="${c.id}"><td><b style="font-weight:600">${esc(c.nome)}</b><div class="small muted">${esc(c.tipo||"")} ${esc(c.doc||"")}</div></td><td class="small">${esc(c.telefone||"")}<div class="muted">${esc(c.email||"")}</div></td>
       <td><div class="row" style="gap:4px"><span class="mono">${ps.length}</span>${[...new Set(ps.map(p=>p.area))].map(chipArea).join("")}</div></td>
+      ${pode("financeiro")?`<td><span class="chip ${situacaoHon(c)[1]}">${esc(situacaoHon(c)[0])}</span></td>`:""}
       <td><div class="row" style="gap:6px;flex-wrap:nowrap"><span class="chip ${acl}">${ast}</span>${gere && ac.estado!=="bloqueado"?`<button class="linkbtn small" data-act="ac-liberar" data-id="${c.id}">${ac.estado==="sem"?"Liberar":ac.estado==="enviado"?"Reenviar":"Enviar endereço"}</button>`:""}</div></td></tr>`;}).join("")}
   </tbody></table></div>`}</div>`;
 }
@@ -1433,6 +1434,16 @@ async function verArquivo(caminho){ try{ const u = await api.urlArquivo(caminho)
 
 /* ---------- FINANCEIRO ---------- */
 const FIN = {filtro:"abertas", mes:""};
+function painelHonorarios(){
+  const cs = S.clientes.slice().sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+  const pend = cs.filter(c=>situacaoHon(c)[1]==="warn"), exito = cs.filter(c=>["exito","fixo_exito"].includes(honDe(c).tipo));
+  if(!pend.length && !exito.length) return "";
+  const item = (c, extra) => `<button class="hon-item" data-act="editar-cliente" data-id="${c.id}"><b>${esc(c.nome)}</b><span>${esc(extra)}</span></button>`;
+  return `<div class="hon-grid">
+    ${pend.length?`<div class="panel"><div class="panel-h"><h2>Honorários à definir <span class="chip warn">${pend.length}</span></h2><span class="small muted">Clique para completar o combinado</span></div><div class="panel-b hon-lista">${pend.map(c=>item(c, situacaoHon(c)[0])).join("")}</div></div>`:""}
+    ${exito.length?`<div class="panel"><div class="panel-h"><h2>Êxito combinado <span class="chip accent">${exito.length}</span></h2><span class="small muted">Lance a cobrança quando houver resultado</span></div><div class="panel-b hon-lista">${exito.map(c=>item(c, `${honDe(c).exito?honDe(c).exito+"% do resultado":"% à definir"}${honDe(c).tipo==="fixo_exito"?" + fixo":""}`)).join("")}</div></div>`:""}
+  </div>`;
+}
 function vFinanceiro(){
   const h = hoje(), ini = h.slice(0,8)+"01", fimMes = iso(addDays(new Date(new Date().getFullYear(), new Date().getMonth()+1, 1), -1));
   const fs = (S.financeiro||[]).slice();
@@ -1445,6 +1456,7 @@ function vFinanceiro(){
   const st = f => f.pago_em ? ["Pago em "+fmt(f.pago_em),"ok"] : f.vencimento<h ? ["Vencida","danger"] : f.vencimento===h ? ["Vence hoje","warn"] : ["A vencer","neutral"];
   return `<div class="head"><div><h1>Financeiro</h1><div class="sub">Honorários a receber, parcelas dos contratos, recibos e mensagens de cobrança.</div></div><button class="btn primary" data-act="fin-novo">${ICON.plus}Nova cobrança</button></div>
   <div class="stats fin-stats"><div class="stat"><span>A receber no mês</span><b>${moeda(soma(mes))}</b><small>${mes.length} parcela(s)</small></div><div class="stat ${venc.length?"alerta":""}"><span>Vencidas</span><b>${moeda(soma(venc))}</b><small>${venc.length} parcela(s)</small></div><div class="stat"><span>Recebido no mês</span><b>${moeda(soma(pagosMes))}</b><small>${pagosMes.length} pagamento(s)</small></div><div class="stat"><span>Total em aberto</span><b>${moeda(soma(abertas))}</b><small>${abertas.length} parcela(s)</small></div></div>
+  ${painelHonorarios()}
   <div class="row" style="justify-content:space-between;margin:6px 0 12px"><div class="seg">${[["abertas","Em aberto"],["vencidas","Vencidas"],["pagas","Pagas"],["todas","Todas"]].map(([k,l])=>`<button data-act="fin-filtro" data-f="${k}" aria-pressed="${FIN.filtro===k}">${l}</button>`).join("")}</div><input type="month" data-bind="FIN.mes" data-re="fin" value="${esc(FIN.mes)}" style="width:auto"></div>
   <div class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Vencimento</th><th>Cliente</th><th>Descrição</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
   ${lista.length?lista.map(f=>{ const [t,c] = st(f), cli = cliById(f.cliente_id); return `<tr style="cursor:default"><td class="mono">${fmt(f.vencimento)}</td><td>${esc(cli?.nome||"—")}</td><td>${esc(f.descricao)}${f.processo_id&&procById(f.processo_id)?`<div class="small muted mono">${esc(procById(f.processo_id).numero||"")}</div>`:""}</td><td><b>${moeda(f.valor)}</b></td><td><span class="chip ${c}">${t}</span></td>
@@ -2248,6 +2260,48 @@ function mAcessoCliente(m){
     ${a.estado!=="bloqueado"?`<div class="row" style="gap:8px">${wa?`<a class="btn primary" href="${wa}" target="_blank" rel="noopener">${ICON.wa}Enviar no WhatsApp</a>`:`<span class="small muted">Cadastre o celular do cliente para enviar pelo WhatsApp.</span>`}${mail?`<a class="btn" href="${mail}">${ICON.mail}Enviar por e-mail</a>`:""}<button class="btn" data-act="copiar-ac-msg">${ICON.copy}Copiar mensagem</button></div>`:""}
   </div><div class="sheet-f">${a.perfil?`<button class="btn ghost" data-act="ac-bloquear" data-id="${a.perfil.id}" style="margin-right:auto">${a.estado==="bloqueado"?"Desbloquear acesso":"Bloquear acesso"}</button>`:a.convite?`<button class="btn ghost" data-act="ac-cancelar" data-id="${a.convite.id}" style="margin-right:auto">Cancelar link</button>`:""}<button class="btn" data-act="editar-cliente" data-id="${m.cid}">Ver cadastro</button><button class="btn primary" data-act="fechar">Concluir</button></div>`;
 }
+/* ---------- financeiro do cliente (honorários combinados) ---------- */
+const TIPOS_HON = [["definir","À definir"],["fixo","Valor fixo (pagamento único)"],["parcelado","Valor fixo parcelado"],["mensal","Mensalidade (partido mensal)"],["exito","Somente êxito (% do resultado)"],["fixo_exito","Fixo + êxito"]];
+const FORMAS_PG = [["","À definir"],"PIX","Boleto","Cartão de crédito","Transferência","Dinheiro"];
+const honDe = c => Object.assign({tipo:"definir"}, ((c||{}).dados||{}).honorarios||{});
+function situacaoHon(c){
+  const h = honDe(c), n = (S.financeiro||[]).filter(f=>f.cliente_id===c.id).length;
+  if(h.tipo==="definir") return n ? [`${n} parcela(s) no Financeiro`, "ok"] : ["À definir","warn"];
+  if(h.tipo==="exito") return [`Êxito ${h.exito?h.exito+"%":"(% à definir)"}`, h.exito?"accent":"warn"];
+  if(!numBR(h.valor) || !h.vencimento || (["parcelado","mensal"].includes(h.tipo) && !Number(h.parcelas))) return ["Valores à definir","warn"];
+  return [n ? `${n} parcela(s) no Financeiro` : "Definido", "ok"];
+}
+function blocoFinCliente(c, ed){
+  const h = honDe(c), dis = ed ? "" : "disabled", lanc = c.id ? (S.financeiro||[]).filter(f=>f.cliente_id===c.id) : [];
+  return `<div class="fin-cli" data-tipo="${esc(h.tipo)}">
+    <div class="row" style="justify-content:space-between"><h3 style="margin:0">Financeiro do cliente</h3>${c.id?`<span class="chip ${situacaoHon(c)[1]}">${esc(situacaoHon(c)[0])}</span>`:""}</div>
+    <div class="grid2">
+      <label class="f span2">Honorários<select id="h-tipo" ${dis} onchange="this.closest('.fin-cli').dataset.tipo=this.value">${opts(TIPOS_HON, h.tipo)}</select></label>
+      <label class="f h-val"><span>Valor <span class="h-lbl-total">total</span><span class="h-lbl-mes">da mensalidade</span></span><input type="text" id="h-valor" inputmode="decimal" value="${esc(h.valor||"")}" placeholder="À definir" ${dis}></label>
+      <label class="f h-parc">Nº de parcelas<input type="number" id="h-parc" min="1" max="120" value="${esc(h.parcelas||"")}" placeholder="À definir" ${dis}></label>
+      <label class="f h-venc">1º vencimento<input type="date" id="h-venc" value="${esc(h.vencimento||"")}" ${dis}></label>
+      <label class="f h-exito">Êxito (% do resultado)<input type="text" id="h-exito" inputmode="decimal" value="${esc(h.exito||"")}" placeholder="À definir" ${dis}></label>
+      <label class="f h-forma">Forma de pagamento<select id="h-forma" ${dis}>${opts(FORMAS_PG, h.forma||"")}</select></label>
+      <label class="f span2 h-obs">Observações do combinado<input type="text" id="h-obs" value="${esc(h.obs||"")}" placeholder="Ex.: entrada na assinatura, desconto à vista" ${dis}></label>
+    </div>
+    <div class="hint">Deixe em branco o que ainda não foi combinado: o cliente fica marcado como <b>à definir</b> no Financeiro. Quando valor e 1º vencimento estiverem preenchidos, as parcelas entram sozinhas no Financeiro.${lanc.length?` Já há ${lanc.length} lançamento(s) deste cliente; mudanças aqui não alteram parcelas já lançadas.`:""}</div>
+  </div>`;
+}
+function lerHonForm(){
+  const v = i => document.getElementById(i)?.value?.trim() ?? "";
+  return {tipo:v("h-tipo")||"definir", valor:v("h-valor"), parcelas:v("h-parc"), vencimento:v("h-venc"), exito:v("h-exito").replace("%",""), forma:v("h-forma"), obs:v("h-obs")};
+}
+/* parcelas a lançar no Financeiro a partir do combinado (só o que já está definido) */
+function parcelasHon(h){
+  const val = numBR(h.valor), n = Math.max(1, Math.min(120, Number(h.parcelas)||1));
+  if(!val || !h.vencimento || h.tipo==="definir" || h.tipo==="exito") return [];
+  const mes = (k) => { const d = parse(h.vencimento); d.setMonth(d.getMonth()+k); return iso(d); };
+  if(h.tipo==="fixo" || (h.tipo==="fixo_exito" && n===1)) return [{descricao:"Honorários", valor:val, vencimento:h.vencimento}];
+  if(h.tipo==="parcelado" || h.tipo==="fixo_exito"){ if(!Number(h.parcelas)) return []; const cada = Math.round(val/n*100)/100, ult = Math.round((val - cada*(n-1))*100)/100;
+    return Array.from({length:n}, (_,k)=>({descricao:`Honorários · parcela ${k+1}/${n}`, valor:k===n-1?ult:cada, vencimento:mes(k)})); }
+  if(h.tipo==="mensal"){ if(!Number(h.parcelas)) return []; return Array.from({length:n}, (_,k)=>({descricao:`Mensalidade ${k+1}/${n}`, valor:val, vencimento:mes(k)})); }
+  return [];
+}
 function mCliente(m){
   const c = m.c || (m.c = m.id ? Object.assign({}, cliById(m.id)) : {tipo:"PF"});
   const ps = m.id ? S.processos.filter(p=>p.cliente_id===m.id) : [];
@@ -2274,6 +2328,7 @@ function mCliente(m){
     <label class="f span2">Endereço completo com CEP<input type="text" id="c-end" value="${esc((c.dados||{}).endereco||"")}" ${ed?"":"disabled"}></label>
     <label class="f span2">Representante legal (empresa)<input type="text" id="c-rep" value="${esc((c.dados||{}).representante||"")}" placeholder="Nome, cargo e CPF" ${ed?"":"disabled"}></label>
     <label class="f span2">Observações<textarea id="c-obs" rows="2" ${ed?"":"disabled"}>${esc(c.obs||"")}</textarea></label></div>
+    ${pode("financeiro")||!m.id ? blocoFinCliente(Object.assign({}, c, {id:m.id}), ed) : ""}
     ${portal}
     ${ps.length?`<div><h3 style="margin-bottom:6px">Processos</h3>${ps.map(p=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="mono gold" data-act="abrir-processo" data-id="${p.id}" style="cursor:pointer">${esc(p.numero||"sem número")}</span>${chipArea(p.area)}<span class="small muted">${esc(p.fase||"")}</span></div>`).join("")}</div>`:""}
   </form><div class="sheet-f">${m.id && pode("excluir_registros")?`<button class="btn danger" data-act="excluir" data-col="clientes" data-id="${m.id}" style="margin-right:auto">Excluir</button>`:""}<button class="btn" data-act="fechar">${ed?"Cancelar":"Fechar"}</button>${ed?`<button class="btn primary" data-act="salvar-cliente">Salvar</button>`:""}</div>`;
@@ -2652,9 +2707,19 @@ document.addEventListener("click", async e => {
     case "novo-cliente": abrirModal({kind:"cliente"}); break;
     case "editar-cliente": abrirModal({kind:"cliente", id}); break;
     case "salvar-cliente": { const v = i => document.getElementById(i)?.value?.trim() ?? ""; const row = {nome:v("c-nome"), tipo:v("c-tipo"), doc:v("c-doc"), telefone:v("c-tel"), email:v("c-email"), obs:v("c-obs"), dados:Object.assign({}, (modal.c||{}).dados||{}, {nacionalidade:v("c-nac"), estado_civil:v("c-ec"), profissao:v("c-prof"), rg:v("c-rg"), endereco:v("c-end"), representante:v("c-rep")})}; if(!row.nome){ toast("Informe o nome."); return; }
+      const temFin = !!$("#h-tipo");
+      const hon = temFin ? lerHonForm() : null, honAntes = honDe(modal.c);
+      if(hon) row.dados.honorarios = Object.assign({}, honAntes, hon);
       const darAcesso = !modal.id && $("#c-portal")?.checked;
       await comErro(async()=>{ let novo = null; if(modal.id) await api.atualizar("clientes", modal.id, row); else novo = await api.inserir("clientes", row);
-        fecharModal(); toast("Cliente salvo"); agendarRecarga("clientes");
+        const cid = modal.id || novo?.id; let nParc = 0;
+        // lança as parcelas uma única vez, quando o combinado fica completo
+        if(hon && cid && !honAntes.lancado && pode("financeiro")){
+          const ps = parcelasHon(hon);
+          if(ps.length){ for(const pc of ps) await api.inserir("financeiro", Object.assign({cliente_id:cid, forma:hon.forma||null, obs:hon.obs||null}, pc));
+            nParc = ps.length; row.dados.honorarios.lancado = new Date().toISOString(); await api.atualizar("clientes", cid, {dados:row.dados}); agendarRecarga("financeiro"); }
+        }
+        fecharModal(); toast(nParc ? `Cliente salvo · ${nParc} parcela(s) lançada(s) no Financeiro` : "Cliente salvo"); agendarRecarga("clientes");
         if(darAcesso && novo && novo.id){ if(!S.clientes.some(x=>x.id===novo.id)) S.clientes.push(novo); if(!(RAW.clientes||[]).some(x=>x.id===novo.id)) (RAW.clientes = RAW.clientes||[]).push(novo); await liberarAcessoCliente(novo.id); } }); break; }
     case "ac-liberar": await liberarAcessoCliente(id); break;
     case "copiar-ac-msg": P.copiar($("#ac-msg")?.value||""); break;

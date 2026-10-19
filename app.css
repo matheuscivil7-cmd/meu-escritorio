@@ -766,3 +766,16 @@ table.tbl.compacta{font-size:.86rem}
   .ch-hist-btn{display:inline-flex}
 }
 @media (hover:none){.hist-x{opacity:1}}
+
+/* ---------- financeiro do cliente ---------- */
+.fin-cli{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--gold-line);background:color-mix(in srgb,var(--gold) 5%,transparent)}
+.fin-cli .h-lbl-mes{display:none}
+.fin-cli[data-tipo="mensal"] .h-lbl-total{display:none}.fin-cli[data-tipo="mensal"] .h-lbl-mes{display:inline}
+.fin-cli[data-tipo="definir"] .h-val,.fin-cli[data-tipo="definir"] .h-parc,.fin-cli[data-tipo="definir"] .h-venc,.fin-cli[data-tipo="definir"] .h-exito{display:none}
+.fin-cli[data-tipo="fixo"] .h-parc,.fin-cli[data-tipo="fixo"] .h-exito,.fin-cli[data-tipo="parcelado"] .h-exito,.fin-cli[data-tipo="mensal"] .h-exito{display:none}
+.fin-cli[data-tipo="exito"] .h-val,.fin-cli[data-tipo="exito"] .h-parc,.fin-cli[data-tipo="exito"] .h-venc{display:none}
+.hon-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:4px 0 10px}
+.hon-lista{display:flex;flex-wrap:wrap;gap:8px}
+.hon-item{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:1px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);transition:border-color .2s}
+.hon-item:hover{border-color:var(--gold)} .hon-item:focus-visible{outline:2px solid var(--gold)}
+.hon-item b{font-size:.88rem;font-weight:600} .hon-item span{font-size:.76rem;color:var(--muted)}
