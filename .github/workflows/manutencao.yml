@@ -1,0 +1,33 @@
+# Meu Escritório · manutenção automática
+# A cada 3 dias faz uma consulta leve (só leitura) ao Supabase para o projeto gratuito
+# não ser pausado por falta de uso. Não grava, não apaga e não altera nenhum dado.
+name: Manutenção do Supabase
+
+on:
+  schedule:
+    - cron: "17 12 */3 * *"   # dias 1, 4, 7, 10... de cada mês, às 9h17 (Brasília)
+  workflow_dispatch:           # permite rodar na hora pelo botão "Run workflow"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  manter-ativo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Consulta leve ao banco, ao login e às funções
+        run: |
+          URL=$(grep -o 'https://[a-z0-9]*\.supabase\.co' config.js | head -1)
+          KEY=$(grep -o 'eyJ[A-Za-z0-9._-]*' config.js | head -1)
+          echo "Banco:    $(curl -sS -o /dev/null -w '%{http_code}' "$URL/rest/v1/escritorios?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")"
+          echo "Login:    $(curl -sS -o /dev/null -w '%{http_code}' "$URL/auth/v1/health" -H "apikey: $KEY")"
+          echo "Notícias: $(curl -sS -o /dev/null -w '%{http_code}' -m 120 -X POST "$URL/functions/v1/noticias" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{}')"
+
+      - name: Mantém este agendamento ligado no GitHub
+        run: |
+          curl -sS -o /dev/null -w 'GitHub: %{http_code}\n' -X PUT \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/manutencao.yml/enable"
