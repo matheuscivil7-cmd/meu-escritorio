@@ -417,8 +417,8 @@ function areasEmUso(){ const u = new Set((S.processos||[]).map(p=>p.area)); retu
 function tabsArea(cont, extra){
   const vis = areasEmUso(), resto = Object.keys(AREAS).filter(k=>!vis.includes(k));
   const itens = [["todas","Todas"],...vis.map(k=>[k,AREAS[k].nome]), ...(extra||[])];
-  return `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><div class="tabs" role="tablist" style="min-width:0;overflow-x:auto"><span class="ind"></span>${itens.map(([k,l])=>`<button role="tab" aria-selected="${filtroArea===k}" data-act="area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}${cont?` <span class="n">${cont[k]||0}</span>`:""}</button>`).join("")}</div>
-    ${resto.length?`<select id="area-mais" aria-label="Outras áreas" style="width:auto;flex:none"><option value="">Outras áreas</option>${resto.map(k=>`<option value="${k}">${AREAS[k].nome}</option>`).join("")}</select>`:""}</div>`;
+  return `<div class="row area-bar" style="gap:8px;align-items:center"><div class="tabs" role="tablist" style="min-width:0;overflow-x:auto"><span class="ind"></span>${itens.map(([k,l])=>`<button role="tab" aria-selected="${filtroArea===k}" data-act="area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}${cont?` <span class="n">${cont[k]||0}</span>`:""}</button>`).join("")}</div>
+    ${resto.length?`<select id="area-mais" aria-label="Outras áreas" class="area-mais"><option value="">Outras áreas</option>${resto.map(k=>`<option value="${k}">${AREAS[k].nome}</option>`).join("")}</select>`:""}</div>`;
 }
 
 /* ---------- INÍCIO ---------- */
@@ -1799,8 +1799,8 @@ function vDireito(voltar){
   return `<div class="head"><div><h1>Direito geral</h1><div class="sub">Assistente para dúvidas, jurisprudência e consulta de processos, além dos temas com prazo e fundamento, súmulas e leis.</div></div>${voltar||""}</div>
   ${blocoAssistenteJuridico()}
   ${voltar?"":blocoRadar()}
-  <div class="row" style="gap:8px;flex-wrap:nowrap"><div class="tabs" role="tablist" style="min-width:0;overflow-x:auto"><span class="ind"></span>${areas.map(([k,l])=>`<button role="tab" aria-selected="${DG.area===k}" data-act="dg-area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}</button>`).join("")}</div>
-    <select id="dg-area-mais" aria-label="Outras áreas do direito" style="width:auto;flex:none"><option value="">Outras áreas (${outras.length})</option>${outras.map(k=>`<option value="${k}">${AREAS[k].nome}</option>`).join("")}</select></div>
+  <div class="row area-bar" style="gap:8px"><div class="tabs" role="tablist" style="min-width:0;overflow-x:auto"><span class="ind"></span>${areas.map(([k,l])=>`<button role="tab" aria-selected="${DG.area===k}" data-act="dg-area" data-a="${k}">${AREAS[k]?`<span class="dot" style="background:var(--${AREAS[k].cor})"></span>`:""}${l}</button>`).join("")}</div>
+    <select id="dg-area-mais" aria-label="Outras áreas do direito" class="area-mais"><option value="">Outras áreas (${outras.length})</option>${outras.map(k=>`<option value="${k}">${AREAS[k].nome}</option>`).join("")}</select></div>
   <div class="dg-grid">
     <div class="panel dg-col"><div class="panel-b" style="display:flex;flex-direction:column;gap:10px">
       <h2 style="font-size:1.05rem;margin:0">Temas e regras</h2>
