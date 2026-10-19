@@ -92,6 +92,7 @@ P.criarDemo = function(){
   const C = {joao:"c-joao", pad:"c-pad", marcos:"c-marcos"};
   const PR = {p1:"p-1", p2:"p-2", p3:"p-3", p4:"p-4"};
   const db = {
+    conversas:[],
     esc:{id:"escritorio", nome:"Lima & Reis Advocacia", codigo:"DEMO01", config:{margem:2}},
     perfis:[
       {id:U.gestor, nome:"Ana Lima", email:"ana@limareis.adv.br", papel:"gestor", status:"ativo", permissoes:P.PADRAO.gestor},

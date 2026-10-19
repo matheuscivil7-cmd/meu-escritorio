@@ -53,7 +53,7 @@ const M = {arquivo:"", texto:"", itens:[], lado:"", destinatario:"", titulo:"", 
 const D = {area:"todas", dia:""};
 const L = {pane:"entrar", ferramenta:"", motivo:"", erro:"", carregando:true, entrando:false, chat:[], chatInput:"", chatOcupado:false,
   calc:{area:"civel", inicio:P.hoje(), dias:15, contagem:"auto", djen:true, suspende:true}, cnj:"", doc:null, docNome:"", docPergunta:"", docIA:null, docOcupado:false, docErro:"", papelPedido:"advogado", nomeEsc:""};
-const CH = {msgs:[], input:"", ocupado:false, pend:{}};
+const CH = {msgs:[], input:"", ocupado:false, pend:{}, cid:null, lista:null, armado:null, histAberto:false};
 const DG = {area:"todas", termo:"", aberto:"", juris:""};
 let LOGO_TMP = null;
 ICON.config = ICON.ajustes;
@@ -422,6 +422,20 @@ function tabsArea(cont, extra){
 }
 
 /* ---------- INÍCIO ---------- */
+/* capa do escritório no Início, no estilo de perfil do LinkedIn: logo sobre um banner nas cores do escritório */
+function capaEscritorio(saudacao){
+  const dc = P.cfg().docs || {}, cor = dc.cor || P.DOC_COR, cor2 = dc.cor2 || P.DOC_OURO, logo = dc.logo || "";
+  const nome = S.escritorio?.nome || "Meu Escritório";
+  const ini = nome.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ ]+/g," ").replace(/\b(e|de|da|do|dos|das|advocacia|advogados|associados|sociedade)\b/gi," ").trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "ME";
+  const ativos = S.processos.filter(p=>p.fase!=="Arquivado").length, equipe = equipeAtiva().length;
+  return `<section class="capa" style="--c1:${esc(cor)};--c2:${esc(cor2)}">
+    <div class="capa-banner"><svg class="capa-linhas" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true"><path d="M0 130 C 160 60, 300 170, 600 40" /><path d="M0 150 C 180 90, 340 190, 600 70" /><path d="M120 0 L 260 160 M 170 0 L 310 160 M 220 0 L 360 160" class="fina"/></svg>
+      ${pode("gerenciar_equipe")?`<button class="capa-editar" data-act="nav" data-v="config" title="Trocar logo e cores">${ICON.paleta}Personalizar</button>`:""}</div>
+    <div class="capa-info">
+      <div class="capa-logo">${logo?`<img src="${logo}" alt="${esc(nome)}">`:`<span style="background:${esc(cor)};color:${esc(cor2)}">${esc(ini)}</span>`}</div>
+      <div class="capa-txt">${saudacao}<div class="capa-sub"><b>${esc(nome)}</b><span>${ativos} processo(s) ativo(s)</span><span>${S.clientes.length} cliente(s)</span><span>${equipe} na equipe</span></div></div>
+    </div></section>`;
+}
 function vInicio(){
   const h = hoje(), d = new Date(), hr = d.getHours();
   const saud = hr<12 ? "Bom dia" : hr<18 ? "Boa tarde" : "Boa noite";
@@ -429,53 +443,60 @@ function vInicio(){
   const pend = minhas.filter(t=>!t.done && t.data);
   const venc = pend.filter(t=>t.data<h), hojeL = pend.filter(t=>t.data>=h && dataTrabalho(t)<=h);
   const feitasHoje = minhas.filter(t=>t.done && (t.concluido_em||"").slice(0,10)===h).length;
-  const tot = hojeL.length + feitasHoje;
+  const tot = hojeL.length + feitasHoje, pct = tot ? feitasHoje/tot : 0, CIRC = 2*Math.PI*38;
   const semana = pend.filter(t=>t.data>h && t.data<=iso(addDays(d,7))).length;
   const aud = pend.filter(t=>t.tipo==="Audiência" && t.data>=h).sort((a,b)=>(a.data+(a.hora||"")).localeCompare(b.data+(b.hora||"")));
+  const prox = pend.filter(t=>t.data>=h && t!==aud[0]).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,3);
   const vazio = !S.tarefas.length && !S.processos.length;
   const q = busca.trim().toLowerCase();
   const res = !q ? [] : S.processos.filter(p=>[p.numero,nomeCliente(p),p.parte_contraria,p.vara].join(" ").toLowerCase().includes(q)).slice(0,6).map(p=>({act:"abrir-processo", id:p.id, t:p.numero||"sem número", s:nomeCliente(p)+" × "+(p.parte_contraria||"—"), a:p.area}))
     .concat(S.clientes.filter(c=>(c.nome||"").toLowerCase().includes(q)).slice(0,4).map(c=>({act:"editar-cliente", id:c.id, t:c.nome, s:"Cliente"})));
-  const ativos = S.processos.filter(p=>p.fase!=="Arquivado");
-  const docsCli = (S.documentos||[]).filter(x=>x.status==="Aguardando cliente").length;
-  const finV = pode("financeiro") ? (S.financeiro||[]).filter(f=>!f.pago_em && f.vencimento<h) : null;
-  const kpi = (n, l, v, cls, extra) => `<button class="kpi-t${cls?" "+cls:""}" data-act="nav" data-v="${v}"><b>${n}</b><span>${l}</span>${extra?`<small>${extra}</small>`:""}</button>`;
-  const lin7 = pend.filter(t=>t.data<=iso(addDays(d,7))).sort((a,b)=>(a.data+(a.hora||"")).localeCompare(b.data+(b.hora||""))).slice(0,10);
-  const linhaAg = t => { const p = procById(t.processo_id), atr = t.data<h; return `<tr data-act="editar-tarefa" data-id="${t.id}"><td class="mono small nowrap">${t.data===h?"<b>Hoje</b>":fmtCurto(t.data)}${t.hora?" "+esc(t.hora):""}</td><td><span class="chip ${atr?"danger":t.tipo==="Audiência"?"accent":"neutral"}">${atr?"Vencido":esc(t.tipo)}</span></td><td class="ell">${esc(t.titulo||"")}</td><td class="ell muted">${p?esc(nomeCliente(p)):"—"}</td><td class="muted small nowrap">${t.atribuido_a?esc(P.primeiroNome(nomePerfil(t.atribuido_a))):"—"}</td></tr>`; };
-  const ands = (S.andamentos||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criado_em||"").localeCompare(a.criado_em||"")).slice(0,6);
-  const linhaAnd = a => { const p = procById(a.processo_id); return `<tr data-act="abrir-processo" data-id="${a.processo_id}"><td class="mono small nowrap">${fmtCurto(a.data)}</td><td class="ell">${esc(a.texto)}</td><td class="ell muted">${p?esc(nomeCliente(p)):"—"}</td></tr>`; };
-  const areasUso = Object.keys(AREAS).filter(k=>S.processos.some(p=>p.area===k));
-  const linhaArea = k => { const ps = ativos.filter(p=>p.area===k), pr = pend.filter(t=>areaDaTarefa(t)===k), vz = pr.filter(t=>t.data<h).length;
-    return `<tr data-act="ir-area" data-a="${k}"><td>${chipArea(k)}</td><td class="num">${ps.length}</td><td class="num">${pr.length}</td><td class="num">${vz?`<b style="color:var(--danger)">${vz}</b>`:"0"}</td><td class="muted small">${AREAS[k].contagem==="uteis"?"úteis":"corridos"}</td></tr>`; };
-  const botoes = [
-    pode("criar_tarefas") && `<button class="btn sm" data-act="nova-tarefa" data-tipo="Prazo">${ICON.plus} Prazo</button>`,
-    pode("criar_tarefas") && `<button class="btn sm" data-act="nova-tarefa" data-tipo="Audiência">${ICON.plus} Audiência</button>`,
-    pode("editar_processos") && `<button class="btn sm" data-act="novo-processo">${ICON.plus} Processo</button>`,
-    (pode("editar_processos")||pode("registrar_andamentos")) && `<button class="btn sm" data-act="ler-pdf">${ICON.scan} Ler intimação</button>`,
-    `<button class="btn sm ghost" data-act="nav" data-v="assistente">${ICON.assistente} Assistente</button>`
-  ].filter(Boolean).join("");
+  const audCard = t => { const p = procById(t.processo_id), dt = parse(t.data); return `<div class="next-card" data-act="editar-tarefa" data-id="${t.id}"><div class="cal"><span>${MESES[dt.getMonth()]}</span><b>${pad(dt.getDate())}</b></div><div style="min-width:0"><b style="display:block">${esc(t.titulo)}</b><span class="small muted">${t.hora?esc(t.hora)+" · ":""}${esc(t.modalidade||"")}${p?" · "+esc(nomeCliente(p)):""}</span>${t.local?`<div class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.local)}</div>`:""}</div></div>`; };
+  const mini = t => { const p = procById(t.processo_id); return `<div class="row" style="justify-content:space-between;flex-wrap:nowrap;cursor:pointer;padding:6px 2px" data-act="editar-tarefa" data-id="${t.id}"><div style="min-width:0"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.titulo)}</div><div class="small muted">${esc(t.tipo)}${p?" · "+esc(nomeCliente(p)):""}</div></div><span class="chip ${t.data===h?"danger":"neutral"}">${t.data===h?"Hoje":fmtCurto(t.data)}</span></div>`; };
+  const acoes = [
+    pode("criar_tarefas") && ["nova-tarefa","Prazo","Novo prazo","Cálculo automático",ICON.agenda],
+    pode("criar_tarefas") && ["nova-tarefa","Audiência","Audiência","Data, hora e local",ICON.gavel],
+    pode("editar_processos") && ["novo-processo","","Processo","Número CNJ conferido",ICON.processos],
+    (pode("editar_processos")||pode("registrar_andamentos")) && ["ler-pdf","","Ler intimação","PDF vira prazo",ICON.scan],
+    pode("revisar_minutas") && ["nav","minutas","Revisar minuta","Comentários do cliente",ICON.minutas],
+    pode("enviar_cliente") && ["nav","relatorios","Mensagem ao cliente","Resumo pronto para copiar",ICON.send],
+    ["nav","assistente","Assistente","Pergunte sobre a carteira",ICON.assistente],
+    ["nav","daily","Daily jurídico","Notícias do dia",ICON.daily],
+    !pode("criar_tarefas") && ["nova-tarefa","Peça","Nova atividade","Para mim",ICON.plus]
+  ].filter(Boolean).slice(0,6);
+  const areaCard = k => { const ps = S.processos.filter(p=>p.area===k && p.fase!=="Arquivado"); const pr = pend.filter(t=>areaDaTarefa(t)===k); const vz = pr.filter(t=>t.data<h).length;
+    return `<button class="area-card" data-act="ir-area" data-a="${k}" style="--c:var(--${AREAS[k].cor});--c-soft:var(--${AREAS[k].cor}-soft)"><div class="t"><b>${AREAS[k].nome}</b><span class="arrow">${ICON.arrow}</span></div>
+      <div class="nums"><div><b>${ps.length}</b><span>processos ativos</span></div><div><b>${pr.length}</b><span>pendências</span></div>${vz?`<div><b style="color:var(--danger)">${vz}</b><span>vencidas</span></div>`:""}</div>
+      <div class="rule">Prazos em dias ${AREAS[k].contagem==="uteis"?"úteis":"corridos"} · ${AREAS[k].lei}</div></button>`; };
+  const lead = vazio ? (pode("editar_processos")?"Sua pauta está vazia. Cadastre o primeiro processo para começar.":"Nenhuma atividade atribuída a você por enquanto.")
+    : hojeL.length ? `${hojeL.length===1?"item para resolver":"itens para resolver"} hoje${pode("ver_agenda_equipe")?", contando prazos internos.":", atribuídos a você."}` : "Nada para hoje. Bom momento para adiantar a semana.";
   return `
-  <div class="topbar compacta"><div><div class="eyebrow">${esc(d.toLocaleDateString("pt-BR",{weekday:"long", day:"numeric", month:"long"}))}</div><h1>${saud}, <span class="gold">${esc(P.primeiroNome(S.perfil.nome))}</span></h1></div><div class="row" style="gap:6px">${botoes}</div></div>
+  ${capaEscritorio(`<div class="eyebrow">${esc(d.toLocaleDateString("pt-BR",{weekday:"long", day:"numeric", month:"long"}))}</div><h1>${saud}, <span class="gold">${esc(P.primeiroNome(S.perfil.nome))}</span></h1>`)}
   <div class="search">${ICON.search}<input type="search" id="busca" data-bind="busca" value="${esc(busca)}" placeholder="Buscar processo, cliente ou parte contrária" autocomplete="off"></div>
   ${q?`<div class="panel">${res.length?res.map(r=>`<div class="item" style="grid-template-columns:minmax(0,1fr) auto;cursor:pointer" data-act="${r.act}" data-id="${r.id}"><div style="min-width:0"><div class="${r.a?"mono":""}" style="font-weight:600">${esc(r.t)}</div><div class="small muted">${esc(r.s)}</div></div>${chipArea(r.a)}</div>`).join(""):`<div class="empty small">Nada encontrado para "${esc(busca)}".</div>`}</div>`:""}
-  ${vazio && pode("editar_processos")?`<div class="panel"><div class="panel-b row" style="justify-content:space-between"><span>Sua pauta está vazia. Cadastre o primeiro processo para começar.</span><button class="btn primary" data-act="novo-processo">${ICON.plus} Cadastrar processo</button></div></div>`:""}
-  <div class="kpi-strip">
-    ${kpi(hojeL.length, pode("ver_agenda_equipe")?"Para hoje":"Seus itens hoje", "agenda", "", tot?`${feitasHoje}/${tot} concluídos`:"")}
-    ${kpi(venc.length, "Vencidos", "agenda", venc.length?"alerta":"")}
-    ${kpi(semana, "Próximos 7 dias", "agenda")}
-    ${kpi(aud.length, "Audiências", "agenda", "", aud[0]?`próxima ${fmtCurto(aud[0].data)}${aud[0].hora?" "+esc(aud[0].hora):""}`:"")}
-    ${kpi(ativos.length, "Processos ativos", "processos")}
-    ${finV ? kpi(finV.length, "Parcelas vencidas", "financeiro", finV.length?"alerta":"", finV.length?moeda(finV.reduce((s2,f)=>s2+Number(f.valor),0)):"") : kpi(docsCli, "Docs com o cliente", "processos")}
-    ${pode("gerenciar_equipe") && S.perfis.some(p=>p.status==="pendente")?kpi(S.perfis.filter(p=>p.status==="pendente").length, "Cadastros a liberar", "equipe", "ouro"):""}
+  <div class="home">
+    <section class="hero">
+      <div class="hero-top"><div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">${pode("ver_agenda_equipe")?"Pauta de hoje":"Suas atividades de hoje"}</span><span class="big">${hojeL.length}</span><span class="lead">${lead}</span></div>
+        ${tot?`<svg class="ring" viewBox="0 0 92 92" role="img" aria-label="${Math.round(pct*100)}% concluído hoje"><circle class="bgc" cx="46" cy="46" r="38"/><circle class="fg" cx="46" cy="46" r="38" stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${(CIRC*(1-pct)).toFixed(1)}" transform="rotate(-90 46 46)"/><text x="46" y="53" text-anchor="middle">${feitasHoje}/${tot}</text></svg>`:""}</div>
+      <div class="hero-alerts">
+        ${vazio && pode("editar_processos")?`<button class="hero-pill gold" data-act="novo-processo">${ICON.plus} Cadastrar processo</button>`:`
+        ${venc.length?`<button class="hero-pill alert" data-act="nav" data-v="agenda"><b>${venc.length}</b> vencido(s)</button>`:""}
+        <button class="hero-pill" data-act="nav" data-v="agenda"><b>${semana}</b> nos próximos 7 dias</button>
+        <button class="hero-pill" data-act="nav" data-v="agenda"><b>${aud.length}</b> audiência(s)</button>`}
+        ${pode("gerenciar_equipe") && S.perfis.some(p=>p.status==="pendente")?`<button class="hero-pill gold" data-act="nav" data-v="equipe"><b>${S.perfis.filter(p=>p.status==="pendente").length}</b> cadastro(s) para liberar</button>`:""}
+      </div>
+    </section>
+    <section class="next">
+      <div class="sec-t"><h3>Próxima audiência</h3><button class="linkbtn" data-act="nav" data-v="agenda">Agenda</button></div>
+      ${aud[0]?audCard(aud[0]):`<div class="next-card" ${pode("criar_tarefas")?`data-act="nova-tarefa" data-tipo="Audiência"`:""}><div class="cal"><span>—</span><b>·</b></div><div><b>Nenhuma audiência</b><div class="small muted">${pode("criar_tarefas")?"Toque para cadastrar":"Sem audiências atribuídas"}</div></div></div>`}
+      <h3 style="margin-top:4px">Em seguida</h3>
+      ${prox.length?prox.map(mini).join(""):`<span class="small muted">Sem outros compromissos.</span>`}
+    </section>
   </div>
-  <div class="dash">
-    <div class="panel dash-a"><div class="panel-h"><h2>Agenda · próximos 7 dias</h2><button class="linkbtn" data-act="nav" data-v="agenda">Ver agenda</button></div>
-      ${lin7.length?`<div class="tbl-wrap"><table class="tbl compacta"><thead><tr><th>Data</th><th>Tipo</th><th>Compromisso</th><th>Cliente</th><th>Resp.</th></tr></thead><tbody>${lin7.map(linhaAg).join("")}</tbody></table></div>`:`<div class="panel-b small muted">Nada nos próximos 7 dias.</div>`}</div>
-    <div class="panel dash-b"><div class="panel-h"><h2>Últimas movimentações</h2><button class="linkbtn" data-act="nav" data-v="processos">Processos</button></div>
-      ${ands.length?`<div class="tbl-wrap"><table class="tbl compacta"><tbody>${ands.map(linhaAnd).join("")}</tbody></table></div>`:`<div class="panel-b small muted">Nenhum andamento registrado.</div>`}</div>
-    ${areasUso.length?`<div class="panel dash-c"><div class="panel-h"><h2>Carteira por área</h2><button class="linkbtn" data-act="ir-area" data-a="todas">Todos</button></div>
-      <div class="tbl-wrap"><table class="tbl compacta"><thead><tr><th>Área</th><th class="num">Ativos</th><th class="num">Pendências</th><th class="num">Vencidas</th><th>Dias</th></tr></thead><tbody>${areasUso.map(linhaArea).join("")}</tbody></table></div></div>`:""}
-  </div>`;
+  <div class="sec-t"><h2>Atalhos</h2></div>
+  <div class="actions">${acoes.map(([act,arg,l,sub,ic])=>`<button class="act" data-act="${act}" ${act==="nav"?`data-v="${arg}"`:arg?`data-tipo="${arg}"`:""}><span class="ic">${ic}</span><span>${l}<small>${sub}</small></span></button>`).join("")}</div>
+  ${S.processos.length?`<div class="sec-t"><h2>Áreas do escritório</h2><button class="linkbtn" data-act="ir-area" data-a="todas">Todos os processos</button></div>
+  <div class="areas">${Object.keys(AREAS).filter(k=>["trabalhista","civel","criminal"].includes(k) || S.processos.some(p=>p.area===k)).map(areaCard).join("")}</div>`:""}`;
 }
 
 /* ---------- AGENDA ---------- */
@@ -636,7 +657,59 @@ function chatHTML(o){
     <div id="chat-fim"></div></div>
   <div class="composer"><textarea id="${o.idIn}" rows="1" data-bind="${o.bind}" placeholder="${o.ph||"Escreva sua pergunta"}">${esc(o.input)}</textarea><button class="btn primary" data-act="${o.act}-enviar">Enviar</button></div>`;
 }
+/* ---------- histórico de conversas do assistente (cada pessoa vê só as suas) ---------- */
+async function carregarConversas(){
+  if(CH.lista) return;
+  CH.lista = [];
+  try{ CH.lista = (await api.carregar("conversas")).filter(c=>!c.usuario_id || c.usuario_id===meuId()); }catch(e){ console.warn("conversas", e); CH.lista = []; }
+  if(view==="assistente") render();
+}
+let TIMER_CONV = null;
+function salvarConversa(){ clearTimeout(TIMER_CONV); TIMER_CONV = setTimeout(gravarConversa, 700); }
+async function gravarConversa(){
+  const msgs = CH.msgs.filter(m=>m.role==="user" || (m.html && !/class="spinner"/.test(m.html))).slice(-60)
+    .map(m=>m.role==="user" ? {role:"user", content:m.content} : {role:"assistant", html:String(m.html).replace(/<div class="row acao-bts"[\s\S]*?<\/div>/g,"")});
+  if(!msgs.some(m=>m.role==="user")) return;
+  const titulo = (CH.msgs.find(m=>m.role==="user")?.content || "Conversa").replace(/\s+/g," ").slice(0,70);
+  try{
+    if(CH.cid){ await api.atualizar("conversas", CH.cid, {titulo, msgs, atualizado_em:new Date().toISOString()});
+      const c = (CH.lista||[]).find(x=>x.id===CH.cid); if(c){ c.titulo = titulo; c.msgs = msgs; c.atualizado_em = new Date().toISOString(); } }
+    else { const c = await api.inserir("conversas", {titulo, msgs, usuario_id:meuId()}); if(c){ CH.cid = c.id; c.atualizado_em = c.atualizado_em || new Date().toISOString(); (CH.lista = CH.lista||[]).unshift(c); } }
+    if(view==="assistente") desenharHistorico();
+  }catch(e){ console.warn("salvar conversa", e); }
+}
+function abrirConversa(id){
+  const c = (CH.lista||[]).find(x=>x.id===id); if(!c) return;
+  CH.cid = id; CH.pend = {}; CH.histAberto = false;
+  CH.msgs = (c.msgs||[]).map(m=>m.role==="user" ? {role:"user", content:m.content} : {role:"assistant", html:m.html});
+  render();
+}
+function htmlHistorico(){
+  if(CH.lista===null) return `<div class="small muted" style="padding:8px">Carregando…</div>`;
+  const ord = CH.lista.slice().sort((a,b)=>(b.atualizado_em||b.criado_em||"").localeCompare(a.atualizado_em||a.criado_em||""));
+  if(!ord.length) return `<div class="small muted" style="padding:8px 10px">As conversas ficam guardadas aqui para você voltar depois.</div>`;
+  const h = hoje(), sem = iso(addDays(new Date(),-7)), mes = iso(addDays(new Date(),-30));
+  const grupos = [["Hoje", c=>c>=h], ["Últimos 7 dias", c=>c<h && c>=sem], ["Últimos 30 dias", c=>c<sem && c>=mes], ["Anteriores", c=>c<mes]];
+  return grupos.map(([t,f])=>{ const l = ord.filter(c=>f((c.atualizado_em||c.criado_em||"").slice(0,10))); if(!l.length) return "";
+    return `<div class="hist-g"><div class="hist-t">${t}</div>${l.map(c=>`<div class="hist-i${c.id===CH.cid?" on":""}"><button class="hist-a" data-act="ch-abrir" data-id="${c.id}" title="${esc(c.titulo||"")}">${esc(c.titulo||"Conversa")}</button><button class="hist-x${CH.armado===c.id?" armed":""}" data-act="ch-apagar" data-id="${c.id}" aria-label="Apagar conversa" title="${CH.armado===c.id?"Clique de novo para apagar":"Apagar"}">${CH.armado===c.id?"Apagar?":ICON.x}</button></div>`).join("")}</div>`; }).join("");
+}
+function desenharHistorico(){ const el = $("#hist-lista"); if(el) el.innerHTML = htmlHistorico(); }
+async function apagarConversa(id){
+  if(CH.armado!==id){ CH.armado = id; desenharHistorico(); setTimeout(()=>{ if(CH.armado===id){ CH.armado = null; desenharHistorico(); } }, 3500); return; }
+  CH.armado = null;
+  try{ await api.excluir("conversas", id); CH.lista = (CH.lista||[]).filter(c=>c.id!==id); if(CH.cid===id){ CH.cid = null; CH.msgs = []; CH.pend = {}; } render(); }
+  catch(e){ toast(P.erroAmigavel(e)); }
+}
 function vAssistente(){
+  if(CH.lista===null) carregarConversas();
+  return `<div class="ch-layout${CH.histAberto?" hist-on":""}">
+    <aside class="ch-hist" aria-label="Histórico de conversas">
+      <button class="btn primary block" data-act="ch-limpar">${ICON.plus}Nova conversa</button>
+      <div id="hist-lista" class="hist-lista">${htmlHistorico()}</div>
+    </aside>
+    <div class="ch-main"><button class="btn ghost ch-hist-btn" data-act="ch-hist">${ICON.assistente}Histórico${(CH.lista||[]).length?` (${CH.lista.length})`:""}</button>${vAssistenteChat()}</div></div>`;
+}
+function vAssistenteChat(){
   return chatHTML({msgs:CH.msgs, input:CH.input, idIn:"ch-in", bind:"CH.input", act:"ch", titulo:"Assistente do escritório",
     sub:"Peça ações (cadastrar processo, cliente, prazo, audiência, andamento, relatórios, mensagens) ou pergunte sobre a carteira e dúvidas jurídicas.",
     vazioTitulo:"O que você quer fazer?", vazioTexto:`Tenho acesso a ${S.processos.length} processo(s) e ${S.tarefas.filter(t=>!t.done).length} compromisso(s) pendente(s). Antes de gravar algo, mostro um resumo para você confirmar.`,
@@ -723,12 +796,12 @@ function enviarChatEscritorio(q){
     if(!h && (juris || P.buscarBase(qc, "todas", 1, 2).length)){
       const m = {role:"assistant", html:nota+`<div class="row muted"><span class="spinner"></span> ${RE_CNJ.test(qc)?"Consultando o processo no DataJud…":"Procurando a resposta…"}</div>`};
       CH.msgs.push(m); render();
-      responderJuridico(qc).then(html=>{ m.html = nota + html; }).catch(e=>{ m.html = nota + `<div class="err">${esc(P.erroAmigavel(e))}</div>`; }).finally(()=>{ if(view==="assistente") render(); });
+      responderJuridico(qc).then(html=>{ m.html = nota + html; }).catch(e=>{ m.html = nota + `<div class="err">${esc(P.erroAmigavel(e))}</div>`; }).finally(()=>{ if(view==="assistente") render(); salvarConversa(); });
       return;
     }
     r = {html: h || ajudaHTML("Não entendi bem esse pedido. Veja exemplos do que consigo fazer:")};
   }
-  CH.msgs.push({role:"assistant", html:nota + r.html, pendId:r.pendId||null}); render();
+  CH.msgs.push({role:"assistant", html:nota + r.html, pendId:r.pendId||null}); render(); salvarConversa();
 }
 function enviarChatLivre(q){
   q = String(q ?? L.chatInput).trim(); if(!q) return;
@@ -993,7 +1066,7 @@ function interpretarAcao(q){
 async function executarAcao(id, op){
   const pd = CH.pend[id]; if(!pd) return;
   const msg = CH.msgs.find(m=>m.pendId===id);
-  const fim = html => { if(msg){ msg.html = html; msg.pendId = null; } delete CH.pend[id]; render(); };
+  const fim = html => { if(msg){ msg.html = html; msg.pendId = null; } delete CH.pend[id]; render(); salvarConversa(); };
   const d = pd.dados;
   if(op==="cancel") return fim(`<span class="muted">Ação cancelada.</span>`);
   if(op==="form"){
@@ -2673,7 +2746,10 @@ document.addEventListener("click", async e => {
       try{ const r = await api.servico("jurisprudencia", {q, pagina:pg}); const msgEl = el.closest(".msg"); const idx = msgEl ? [...document.querySelectorAll(".dga-chat .msg")].indexOf(msgEl) : -1;
         const div = document.createElement("div"); div.innerHTML = htmlJuris(r||{}, q); el.replaceWith(div); if(idx>=0 && DGA.msgs[idx]) DGA.msgs[idx].html = msgEl.innerHTML; }
       catch(e){ el.disabled = false; el.textContent = "Tentar de novo"; toast(P.erroAmigavel(e)); } break; }
-    case "ch-limpar": CH.msgs = []; render(); break;
+    case "ch-limpar": CH.msgs = []; CH.cid = null; CH.pend = {}; CH.histAberto = false; render(); break;
+    case "ch-abrir": abrirConversa(el.dataset.id); break;
+    case "ch-apagar": apagarConversa(el.dataset.id); break;
+    case "ch-hist": CH.histAberto = !CH.histAberto; render(); break;
     case "dg-area": DG.area = el.dataset.a; refazer(); break;
     case "dg-abrir": DG.aberto = DG.aberto===el.dataset.id ? "" : el.dataset.id; refazer(); break;
     case "juris": { const q = (el.dataset.q || $("#jp-termo")?.value || "").trim(); if(!q){ toast("Escreva o tema da pesquisa."); $("#jp-termo")?.focus(); break; } DG.juris = q; const o = P.ONDE_PESQUISAR.find(x=>x[0]===el.dataset.o); const extra = el.dataset.o==="tj" ? ($("#jp-uf")?.value||"SP") : el.dataset.o==="trt" ? ($("#jp-trt")?.value||"2") : ""; window.open(o[2](q, extra), "_blank", "noopener"); break; }
