@@ -85,6 +85,8 @@ const proximo = pid => S.tarefas.filter(t=>t.processo_id===pid && !t.done && t.d
 const ehEnvioCliente = a => !a.visivel_cliente && /^Cliente enviou/.test(a.texto||"");
 const msgsDe = pid => (S.mensagens||[]).filter(m=>m.processo_id===pid).sort((a,b)=>(a.criado_em||"").localeCompare(b.criado_em||""));
 const novidadesCliente = pid => ({msgs: msgsDe(pid).filter(m=>m.de_cliente && !m.lida_escritorio_em).length, docs: S.documentos.filter(d=>d.processo_id===pid && d.status==="Enviado pelo cliente").length});
+const avisoEmailAtivo = p => { const c = cliById(p?.cliente_id); return !!c && !!(c.email||"").trim() && (c.dados||{}).avisos_email!==false; };
+const seloEmail = a => { const v = (S.avisos_email||[]).find(x=>x.andamento_id===a.id); if(!v) return ""; const [t,c] = {pendente:["E-mail em até 10 min","neutral"], enviado:["E-mail enviado","ok"], erro:["E-mail não enviado","danger"], sem_email:["Cliente sem e-mail","warn"]}[v.status]||["",""]; return t?`<span class="chip ${c}" title="${esc(v.destino||"")}">${t}</span>`:""; };
 const andamentosDe = pid => S.andamentos.filter(a=>a.processo_id===pid && !ehEnvioCliente(a)).sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criado_em||"").localeCompare(a.criado_em||""));
 const docsDe = pid => S.documentos.filter(a=>a.processo_id===pid).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
 const tarefasVisiveis = () => S.tarefas.filter(t=> escopoAgenda==="meus" ? t.atribuido_a===meuId() : true);
@@ -145,6 +147,7 @@ function filtrar(){
   S.andamentos = (RAW.andamentos||[]).filter(a=>ids.has(a.processo_id));
   S.documentos = (RAW.documentos||[]).filter(a=>ids.has(a.processo_id));
   S.mensagens = (RAW.mensagens||[]).filter(a=>ids.has(a.processo_id));
+  S.avisos_email = (RAW.avisos_email||[]).filter(a=>ids.has(a.processo_id));
   const cli = new Set(S.processos.map(p=>p.cliente_id));
   S.clientes = (RAW.clientes||[]).filter(c=> pode("gerenciar_clientes") || todos || cli.has(c.id));
   S.revisoes = pode("revisar_minutas") ? (RAW.revisoes||[]) : [];
@@ -2362,7 +2365,8 @@ function mCliente(m){
     <label class="f span2">Endereço completo com CEP<input type="text" id="c-end" value="${esc((c.dados||{}).endereco||"")}" ${ed?"":"disabled"}></label>
     <label class="f span2">Representante legal (empresa)<input type="text" id="c-rep" value="${esc((c.dados||{}).representante||"")}" placeholder="Nome, cargo e CPF" ${ed?"":"disabled"}></label>
     <label class="f span2">Observações<textarea id="c-obs" rows="2" ${ed?"":"disabled"}>${esc(c.obs||"")}</textarea></label>
-    ${campoAdvogado(c, m.id)}</div>
+    ${campoAdvogado(c, m.id)}
+    <label class="check span2"><input type="checkbox" id="c-aviso" ${(c.dados||{}).avisos_email===false?"":"checked"} ${ed?"":"disabled"}> <span>Avisar o cliente por e-mail a cada novo andamento visível no portal${c.email?"":` <span class="small muted">(cadastre o e-mail acima para ativar)</span>`}</span></label></div>
     ${pode("financeiro")||!m.id ? blocoFinCliente(Object.assign({}, c, {id:m.id}), ed) : ""}
     ${portal}
     ${ps.length?`<div><h3 style="margin-bottom:6px">Processos</h3>${ps.map(p=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="mono gold" data-act="abrir-processo" data-id="${p.id}" style="cursor:pointer">${esc(p.numero||"sem número")}</span>${chipArea(p.area)}<span class="small muted">${esc(p.fase||"")}</span></div>`).join("")}</div>`:""}
@@ -2602,8 +2606,8 @@ function mDetalhe(m){
   if(aba==="prazos") corpo = `<div class="row" style="justify-content:flex-end">${pode("criar_tarefas")?`<button class="btn" data-act="nova-tarefa" data-tipo="Audiência" data-proc="${p.id}">${ICON.plus}Audiência</button><button class="btn" data-act="nova-tarefa" data-tipo="Peça" data-proc="${p.id}">${ICON.plus}Tarefa</button>`:""}<button class="btn primary" data-act="nova-tarefa" data-tipo="${pode("criar_tarefas")?"Prazo":"Peça"}" data-proc="${p.id}">${ICON.plus}${pode("criar_tarefas")?"Prazo":"Atividade"}</button></div>
     <div class="panel"><div class="pauta">${ts.length?ts.map(itemTarefa).join(""):`<div class="empty small">Nenhum compromisso neste processo.</div>`}</div></div>`;
   if(aba==="andamentos") corpo = `${podeReg?`<div class="calc dj-box">${blocoDataJud(p)}</div>`:""}${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="date" id="and-data" value="${hoje()}" style="width:auto"><input type="text" id="and-txt" placeholder="Ex.: Juntada de contestação"><button class="btn primary" data-act="add-andamento" data-id="${p.id}">Incluir</button></div>
-      <div class="row" style="justify-content:space-between;gap:8px"><label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label><span class="small muted">Arquivos e documentos ficam na aba Documentos.</span></div></div>`:""}
-    ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span>${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</div><div>${esc(a.texto)}</div>${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button><button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
+      <div class="row" style="justify-content:space-between;gap:8px"><label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label><span class="small muted">${avisoEmailAtivo(p)?"O cliente recebe as novidades por e-mail (em até 10 min). ":""}Arquivos ficam na aba Documentos.</span></div></div>`:""}
+    ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span><span class="row" style="gap:6px">${seloEmail(a)}${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</span></div><div>${esc(a.texto)}</div>${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button><button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
   if(aba==="documentos"){
     const recebidos = docs.filter(d=>d.status==="Enviado pelo cliente" || (d.status==="Recebido" && d.arquivo)), pedidos = docs.filter(d=>d.status==="Aguardando cliente"), outros = docs.filter(d=>!recebidos.includes(d) && !pedidos.includes(d));
     const linhaDoc = (d, extra) => `<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}${d.status==="Enviado pelo cliente"?` <span class="chip warn">novo</span>`:""}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}${d.arquivo?` · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.arquivo)}">Abrir arquivo</button>`:""}${podeReg?` · <label class="linkbtn small" style="cursor:pointer">${d.arquivo?"Trocar arquivo":"Anexar arquivo"}<input type="file" hidden data-file="doc-anexo" data-id="${d.id}" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label>`:""}</div></div>${extra||""}<select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`;
@@ -2753,8 +2757,8 @@ document.addEventListener("click", async e => {
       if(f && f.size > 10*1024*1024){ toast("Arquivo maior que 10 MB."); return; }
       el.disabled = true; await comErro(async()=>{ const row = {processo_id:id, data:$("#and-data").value||hoje(), texto:txt, visivel_cliente:$("#and-vis").checked};
         if(f){ toast("Enviando o documento…"); row.arquivo = await api.enviarArquivo(caminhoProcesso(id, f.name), f); row.arquivo_nome = f.name; }
-        await api.inserir("andamentos", row); agendarRecarga("andamentos"); toast(f ? "Andamento e documento registrados" : "Andamento registrado"); }); el.disabled = false; break; }
-    case "and-vis": { const x = S.andamentos.find(y=>y.id===id); await comErro(async()=>{ await api.atualizar("andamentos", id, {visivel_cliente:!x.visivel_cliente}); agendarRecarga("andamentos"); }); break; }
+        await api.inserir("andamentos", row); agendarRecarga("andamentos"); agendarRecarga("avisos_email"); toast(f ? "Andamento e documento registrados" : "Andamento registrado"); }); el.disabled = false; break; }
+    case "and-vis": { const x = S.andamentos.find(y=>y.id===id); await comErro(async()=>{ await api.atualizar("andamentos", id, {visivel_cliente:!x.visivel_cliente}); agendarRecarga("andamentos"); agendarRecarga("avisos_email"); }); break; }
     case "del-and": await comErro(async()=>{ await api.excluir("andamentos", id); agendarRecarga("andamentos"); }); break;
     case "pt-aba": { PT.aba[el.dataset.p] = el.dataset.a; render(); if(el.dataset.a==="mensagens"){ const pp = (S.portal?.processos||[]).find(x=>x.id===el.dataset.p); if(pp && (pp.mensagens||[]).some(m=>!m.de_cliente && !m.lida)){ try{ await api.rpc("cliente_ler_mensagens", {pid:el.dataset.p}); S.portal = await api.portal(); render(); }catch(e){} } } break; }
     case "pt-msg": { const pid = el.dataset.p, ta = $("#pm-"+pid), tx = (ta?.value||"").trim(); if(!tx){ toast("Escreva a mensagem."); ta?.focus(); return; }
@@ -2769,7 +2773,7 @@ document.addEventListener("click", async e => {
     /* clientes e portal */
     case "novo-cliente": abrirModal({kind:"cliente"}); break;
     case "editar-cliente": abrirModal({kind:"cliente", id}); break;
-    case "salvar-cliente": { const v = i => document.getElementById(i)?.value?.trim() ?? ""; const row = {nome:v("c-nome"), tipo:v("c-tipo"), doc:v("c-doc"), telefone:v("c-tel"), email:v("c-email"), obs:v("c-obs"), dados:Object.assign({}, (modal.c||{}).dados||{}, {nacionalidade:v("c-nac"), estado_civil:v("c-ec"), profissao:v("c-prof"), rg:v("c-rg"), endereco:v("c-end"), representante:v("c-rep")})}; if(!row.nome){ toast("Informe o nome."); return; }
+    case "salvar-cliente": { const v = i => document.getElementById(i)?.value?.trim() ?? ""; const row = {nome:v("c-nome"), tipo:v("c-tipo"), doc:v("c-doc"), telefone:v("c-tel"), email:v("c-email"), obs:v("c-obs"), dados:Object.assign({}, (modal.c||{}).dados||{}, {nacionalidade:v("c-nac"), estado_civil:v("c-ec"), profissao:v("c-prof"), rg:v("c-rg"), endereco:v("c-end"), representante:v("c-rep"), avisos_email:$("#c-aviso")?$("#c-aviso").checked:((modal.c||{}).dados||{}).avisos_email})}; if(!row.nome){ toast("Informe o nome."); return; }
       const temFin = !!$("#h-tipo");
       const hon = temFin ? lerHonForm() : null, honAntes = honDe(modal.c);
       if(hon) row.dados.honorarios = Object.assign({}, honAntes, hon);

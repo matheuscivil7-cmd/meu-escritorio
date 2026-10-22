@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 const P = window.Pauta;
-const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos","financeiro","atendimentos","mensagens"];
+const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos","financeiro","atendimentos","mensagens","avisos_email"];
 P.TABELAS = TABELAS;
 const agora = () => new Date().toISOString();
 const base = () => location.origin + location.pathname;
