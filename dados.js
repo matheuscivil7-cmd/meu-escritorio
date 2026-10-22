@@ -102,9 +102,9 @@ P.criarDemo = function(){
     ],
     convites:[{id:"cv1", token:"demo-convite-123", nome:"Rafael Nunes", email:"rafael@limareis.adv.br", papel:"advogado", permissoes:P.PADRAO.advogado, criado_em:new Date().toISOString(), expira_em:P.addDays(new Date(),7).toISOString()}],
     clientes:[
-      {id:C.joao, nome:"João Batista Souza", tipo:"PF", telefone:"(11) 98888-0001", email:"joao.souza@email.com"},
-      {id:C.pad, nome:"Padaria Bom Grão Ltda.", tipo:"PJ", telefone:"(11) 4000-0002", email:"contato@bomgrao.com.br"},
-      {id:C.marcos, nome:"Marcos Vieira", tipo:"PF", telefone:"(11) 97777-0003"}
+      {id:C.joao, nome:"João Batista Souza", tipo:"PF", telefone:"(11) 98888-0001", email:"joao.souza@email.com", advogado_id:U.gestor},
+      {id:C.pad, nome:"Padaria Bom Grão Ltda.", tipo:"PJ", telefone:"(11) 4000-0002", email:"contato@bomgrao.com.br", advogado_id:U.adv},
+      {id:C.marcos, nome:"Marcos Vieira", tipo:"PF", telefone:"(11) 97777-0003", advogado_id:U.gestor}
     ],
     processos:[
       {id:PR.p1, numero:"1000123-06.2026.5.02.0384", area:"trabalhista", cliente_id:C.joao, polo:"Autor / reclamante", parte_contraria:"Transportes Rápido S.A.", vara:"4ª Vara do Trabalho de Osasco", fase:"Instrução", responsavel_id:U.gestor, valor:"R$ 85.000,00", resumo:"Horas extras e insalubridade. Laudo pericial favorável. Cliente aceita acordo acima de R$ 60 mil.", resumo_cliente:"A perícia foi favorável a você. Agora aguardamos a audiência em que as testemunhas serão ouvidas.", atualizado_em:new Date().toISOString()},

@@ -61,11 +61,20 @@ Object.assign(L, {tela:"entrar", token:"", convite:null, erroForm:"", msg:"", en
 S.convites = [];
 
 /* ---------- permissões ---------- */
-const pode = k => { const p = S.perfil; return !!p && p.status==="ativo" && p.papel!=="cliente" && (p.papel==="gestor" || !!(p.permissoes||{})[k]); };
+/* trava de "somente visualização" para processo/cliente de outro advogado */
+const TRAVA = {on:false}, TRAVAVEIS = new Set(["editar_processos","registrar_andamentos","excluir_registros","gerenciar_clientes"]);
+const pode = k => { if(TRAVA.on && TRAVAVEIS.has(k)) return false; const p = S.perfil; return !!p && p.status==="ativo" && p.papel!=="cliente" && (p.papel==="gestor" || !!(p.permissoes||{})[k]); };
 const ehCliente = () => S.perfil && S.perfil.papel==="cliente";
 const meuId = () => S.perfil && S.perfil.id;
-const equipeAtiva = () => S.perfis.filter(p=>p.status==="ativo" && p.papel!=="cliente");
+const equipeAtiva = () => S.perfis.filter(p=>p.status==="ativo" && p.papel!=="cliente")
+const ehGestor = () => (S.perfil||{}).papel==="gestor"
+const advogadosAtivos = () => equipeAtiva().filter(u=>u.papel==="gestor"||u.papel==="advogado")
+/* advogado que cadastra cliente fica vinculado a ele; o gestor escolhe */
+const advAutomatico = () => (S.perfil||{}).papel==="advogado" && pode("editar_processos") ? meuId() : null;
 const nomePerfil = id => (S.perfis.find(p=>p.id===id)||{}).nome || "";
+/* só o responsável (ou o gestor) altera; sem responsável, valem as permissões normais */
+const podeAlterarProc = p => !p || ehGestor() || !p.responsavel_id || p.responsavel_id===meuId();
+const podeAlterarCli = c => !c || ehGestor() || !c.advogado_id || c.advogado_id===meuId();
 const procById = id => S.processos.find(p=>p.id===id);
 const cliById = id => S.clientes.find(c=>c.id===id);
 const nomeCliente = p => p ? (cliById(p.cliente_id)?.nome || "—") : "";
@@ -574,9 +583,10 @@ function vClientes(){
   return `<div class="head"><div><h1>Clientes</h1><div class="sub">${S.clientes.length} cliente(s). Ao cadastrar, o app já cria o link para o cliente acompanhar os processos pelo portal.</div></div>${pode("gerenciar_clientes")?`<button class="btn primary" data-act="novo-cliente">${ICON.plus}Novo cliente</button>`:""}</div>
   <div class="search">${ICON.search}<input type="search" id="busca" placeholder="Buscar cliente" value="${esc(busca)}" data-bind="busca"></div>
   <div class="panel">${!S.clientes.length?`<div class="empty"><h2>Nenhum cliente ainda</h2><p>Clientes também podem ser criados direto no cadastro do processo.</p></div>`:`
-  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Contato</th><th>Processos</th>${pode("financeiro")?"<th>Honorários</th>":""}<th>Acesso ao portal</th></tr></thead><tbody>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Contato</th><th>Advogado</th><th>Processos</th>${pode("financeiro")?"<th>Honorários</th>":""}<th>Acesso ao portal</th></tr></thead><tbody>
   ${cs.map(c=>{ const ps = S.processos.filter(p=>p.cliente_id===c.id); const ac = acessoCliente(c.id), [acl, ast] = CHIP_ACESSO[ac.estado], gere = pode("gerenciar_equipe");
     return `<tr data-act="editar-cliente" data-id="${c.id}"><td><b style="font-weight:600">${esc(c.nome)}</b><div class="small muted">${esc(c.tipo||"")} ${esc(c.doc||"")}</div></td><td class="small">${esc(c.telefone||"")}<div class="muted">${esc(c.email||"")}</div></td>
+      <td class="small">${c.advogado_id?esc(nomePerfil(c.advogado_id)):`<span class="muted">—</span>`}</td>
       <td><div class="row" style="gap:4px"><span class="mono">${ps.length}</span>${[...new Set(ps.map(p=>p.area))].map(chipArea).join("")}</div></td>
       ${pode("financeiro")?`<td><span class="chip ${situacaoHon(c)[1]}">${esc(situacaoHon(c)[0])}</span></td>`:""}
       <td><div class="row" style="gap:6px;flex-wrap:nowrap"><span class="chip ${acl}">${ast}</span>${gere && ac.estado!=="bloqueado"?`<button class="linkbtn small" data-act="ac-liberar" data-id="${c.id}">${ac.estado==="sem"?"Liberar":ac.estado==="enviado"?"Reenviar":"Enviar endereço"}</button>`:""}</div></td></tr>`;}).join("")}
@@ -2302,6 +2312,12 @@ function parcelasHon(h){
   if(h.tipo==="mensal"){ if(!Number(h.parcelas)) return []; return Array.from({length:n}, (_,k)=>({descricao:`Mensalidade ${k+1}/${n}`, valor:val, vencimento:mes(k)})); }
   return [];
 }
+function campoAdvogado(c, existe){
+  if(ehGestor()) return `<label class="f span2">Advogado responsável<select id="c-adv"><option value="">Sem advogado definido</option>${opts(advogadosAtivos().map(u=>[u.id, u.nome + (u.id===meuId()?" (você)":"")]), c.advogado_id||"")}</select><span class="hint">Só o gestor escolhe e altera o advogado vinculado ao cliente. Novos processos deste cliente já vêm com esse responsável.</span></label>`;
+  const auto = !existe && advAutomatico();
+  const nome = auto ? (S.perfil.nome + " (você)") : (nomePerfil(c.advogado_id) || "Não definido");
+  return `<label class="f span2">Advogado responsável<input type="text" value="${esc(nome)}" disabled><span class="hint">${auto?"O cliente fica vinculado a você automaticamente.":"Só o gestor pode alterar o advogado vinculado."}</span></label>`;
+}
 function mCliente(m){
   const c = m.c || (m.c = m.id ? Object.assign({}, cliById(m.id)) : {tipo:"PF"});
   const ps = m.id ? S.processos.filter(p=>p.cliente_id===m.id) : [];
@@ -2327,7 +2343,8 @@ function mCliente(m){
     <label class="f">RG<input type="text" id="c-rg" value="${esc((c.dados||{}).rg||"")}" ${ed?"":"disabled"}></label>
     <label class="f span2">Endereço completo com CEP<input type="text" id="c-end" value="${esc((c.dados||{}).endereco||"")}" ${ed?"":"disabled"}></label>
     <label class="f span2">Representante legal (empresa)<input type="text" id="c-rep" value="${esc((c.dados||{}).representante||"")}" placeholder="Nome, cargo e CPF" ${ed?"":"disabled"}></label>
-    <label class="f span2">Observações<textarea id="c-obs" rows="2" ${ed?"":"disabled"}>${esc(c.obs||"")}</textarea></label></div>
+    <label class="f span2">Observações<textarea id="c-obs" rows="2" ${ed?"":"disabled"}>${esc(c.obs||"")}</textarea></label>
+    ${campoAdvogado(c, m.id)}</div>
     ${pode("financeiro")||!m.id ? blocoFinCliente(Object.assign({}, c, {id:m.id}), ed) : ""}
     ${portal}
     ${ps.length?`<div><h3 style="margin-bottom:6px">Processos</h3>${ps.map(p=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="mono gold" data-act="abrir-processo" data-id="${p.id}" style="cursor:pointer">${esc(p.numero||"sem número")}</span>${chipArea(p.area)}<span class="small muted">${esc(p.fase||"")}</span></div>`).join("")}</div>`:""}
@@ -2422,7 +2439,11 @@ function abrirModal(m){
   const fn = {tarefa:mTarefa, processo:mProcesso, detalhe:mDetalhe, cliente:mCliente, perfil:mPerfil, mais:mMais, usuario:mUsuario, comunicar:mComunicar, leitor:mLeitor, com:mCom, aparencia:mAparencia, convite:mConvite, novaSenha:mNovaSenha, docgerado:mDocGerado, modelo:mModelo, financeiro:mFinanceiro, atendimento:mAtendimento, agendaCelular:mAgendaCelular, acessoCliente:mAcessoCliente, novoModelo:mNovoModelo, gerarModelo:mGerarModelo, camposModelo:mCamposModelo}[m.kind];
   const sheet = $("#sheet");
   sheet.className = "sheet" + (["detalhe","leitor"].includes(m.kind)?" wide":"") + (m.kind==="docgerado"?" wide docview":"");
-  sheet.innerHTML = fn(m);
+  const trava = !!m.id && ((["detalhe","processo"].includes(m.kind) && !podeAlterarProc(procById(m.id))) || (m.kind==="cliente" && !podeAlterarCli(cliById(m.id))));
+  TRAVA.on = trava;
+  try { sheet.innerHTML = fn(m); } finally { TRAVA.on = false; }
+  if(trava){ const dono = m.kind==="cliente" ? nomePerfil(cliById(m.id)?.advogado_id) : nomePerfil(procById(m.id)?.responsavel_id);
+    const h = sheet.querySelector(".sheet-h"); if(h) h.insertAdjacentHTML("afterend", `<div class="notice small" style="margin:12px 20px 0">${ICON.eye||""}<b>Somente visualização.</b> ${m.kind==="cliente"?"Este cliente está vinculado a":"Este processo é de responsabilidade de"} ${esc(dono||"outro advogado")}. Só ${esc(dono||"o responsável")} e o gestor podem alterar.</div>`); }
   $("#overlay").hidden = false;
   if(m.kind==="tarefa") atualizarCalc();
   if(m.kind==="processo") atualizarCNJ();
@@ -2511,7 +2532,7 @@ function mProcesso(m){
     <label class="f">Polo do cliente<select id="p-polo">${opts(["Autor / reclamante","Réu / reclamada","Acusado","Vítima / assistente de acusação","Interessado"], p.polo)}</select></label>
     <label class="f">Parte contrária<input type="text" id="p-contra" value="${esc(p.parte_contraria||"")}"></label>
     <label class="f">Vara / tribunal<input type="text" id="p-vara" value="${esc(p.vara||"")}" placeholder="Ex.: 3ª Vara Cível de Taboão da Serra"></label>
-    <label class="f">Responsável<select id="p-resp">${opts(equipeAtiva().map(u=>[u.id,u.nome]), p.responsavel_id)}</select></label>
+    <label class="f">Responsável<select id="p-resp" ${m.id && !ehGestor()?"disabled":""}>${opts(equipeAtiva().map(u=>[u.id,u.nome]), p.responsavel_id)}</select>${m.id && !ehGestor()?`<span class="hint">Só o gestor troca o responsável.</span>`:""}</label>
     <label class="f">Valor da causa<input type="text" id="p-valor" value="${esc(p.valor||"")}" placeholder="R$"></label>
     <label class="f span2">Situação interna (só a equipe vê)<textarea id="p-resumo" rows="3" placeholder="Estratégia, combinações com o cliente, riscos">${esc(p.resumo||"")}</textarea></label>
     <label class="f span2">Resumo para o cliente (aparece no portal e nas atualizações)<textarea id="p-resumo-cli" rows="2" placeholder="Ex.: Aguardamos a sentença. Avisaremos assim que sair.">${esc(p.resumo_cliente||"")}</textarea></label>
@@ -2531,7 +2552,7 @@ async function salvarProcesso(){
   if(!row.area){ toast("Escolha a área do processo."); return; }
   let cli = v("p-cli");
   try{
-    if(cli==="__novo"){ const nome = v("p-cli-novo"); if(!nome){ toast("Informe o nome do novo cliente."); return; } const c = await api.inserir("clientes",{escritorio_id:S.escritorio.id, nome, tipo:"PF"}); cli = c.id; await recarregar("clientes", true); }
+    if(cli==="__novo"){ const nome = v("p-cli-novo"); if(!nome){ toast("Informe o nome do novo cliente."); return; } const c = await api.inserir("clientes",{escritorio_id:S.escritorio.id, nome, tipo:"PF", advogado_id: ehGestor() ? (v("p-resp")||null) : advAutomatico()}); cli = c.id; await recarregar("clientes", true); }
     row.cliente_id = cli || null;
     let id = modal.id;
     if(id) await api.atualizar("processos", id, row); else { const r = await api.inserir("processos", Object.assign({escritorio_id:S.escritorio.id}, row)); id = r.id; }
@@ -2710,6 +2731,7 @@ document.addEventListener("click", async e => {
       const temFin = !!$("#h-tipo");
       const hon = temFin ? lerHonForm() : null, honAntes = honDe(modal.c);
       if(hon) row.dados.honorarios = Object.assign({}, honAntes, hon);
+      if(ehGestor()) row.advogado_id = v("c-adv") || null; else if(!modal.id && advAutomatico()) row.advogado_id = advAutomatico();
       const darAcesso = !modal.id && $("#c-portal")?.checked;
       await comErro(async()=>{ let novo = null; if(modal.id) await api.atualizar("clientes", modal.id, row); else novo = await api.inserir("clientes", row);
         const cid = modal.id || novo?.id; let nParc = 0;
@@ -2896,7 +2918,7 @@ document.addEventListener("change", async e => {
   if(el.id==="daily-dia"){ D.dia = el.value; render(); return; }
   if(el.id==="l-papel"){ L.papelPedido = el.value; return; }
   if(el.dataset.act==="doc-status"){ await comErro(async()=>{ await api.atualizar("documentos", el.dataset.id, {status:el.value}); agendarRecarga("documentos"); }); return; }
-  if(el.id==="p-cli"){ const w = $("#novo-cli-wrap"); if(w) w.hidden = el.value!=="__novo"; return; }
+  if(el.id==="p-cli"){ const w = $("#novo-cli-wrap"); if(w) w.hidden = el.value!=="__novo"; const adv = (cliById(el.value)||{}).advogado_id, r = $("#p-resp"); if(adv && r && !modal?.id && [...r.options].some(o=>o.value===adv)) r.value = adv; return; }
   if(el.id==="cv-p" && modal && modal.kind==="convite"){ lerConviteForm(); modal.c.permissoes = Object.assign({}, P.PADRAO[modal.c.papel]); abrirModal(modal); return; }
   if(el.id==="u-papel" && modal && modal.kind==="usuario"){ lerUsuarioForm(); modal.u.permissoes = Object.assign({}, P.PADRAO[modal.u.papel]); abrirModal(modal); return; }
   if(el.id==="lt-proc" && modal) modal.processo_id = el.value;
