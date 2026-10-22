@@ -81,7 +81,11 @@ const nomeCliente = p => p ? (cliById(p.cliente_id)?.nome || "—") : "";
 const areaDaTarefa = t => procById(t.processo_id)?.area || "";
 const dataTrabalho = t => (t.tipo==="Prazo" && t.interno) ? t.interno : t.data;
 const proximo = pid => S.tarefas.filter(t=>t.processo_id===pid && !t.done && t.data).sort((a,b)=>a.data.localeCompare(b.data))[0];
-const andamentosDe = pid => S.andamentos.filter(a=>a.processo_id===pid).sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criado_em||"").localeCompare(a.criado_em||""));
+/* envios do cliente não entram na linha do tempo (ficam em Documentos) */
+const ehEnvioCliente = a => !a.visivel_cliente && /^Cliente enviou/.test(a.texto||"");
+const msgsDe = pid => (S.mensagens||[]).filter(m=>m.processo_id===pid).sort((a,b)=>(a.criado_em||"").localeCompare(b.criado_em||""));
+const novidadesCliente = pid => ({msgs: msgsDe(pid).filter(m=>m.de_cliente && !m.lida_escritorio_em).length, docs: S.documentos.filter(d=>d.processo_id===pid && d.status==="Enviado pelo cliente").length});
+const andamentosDe = pid => S.andamentos.filter(a=>a.processo_id===pid && !ehEnvioCliente(a)).sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criado_em||"").localeCompare(a.criado_em||""));
 const docsDe = pid => S.documentos.filter(a=>a.processo_id===pid).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
 const tarefasVisiveis = () => S.tarefas.filter(t=> escopoAgenda==="meus" ? t.atribuido_a===meuId() : true);
 
@@ -117,7 +121,9 @@ async function entrarNoApp(){
   if(!S.perfil || L.entrando) return;
   if(L.token){ L.token = ""; L.convite = null; history.replaceState(null, "", location.pathname); }
   L.entrando = true; mostrarInicio();
-  if(ehCliente()){ try{ S.portal = await api.portal(); }catch(e){ S.portal = null; } view = "portal"; L.entrando = false; montarShell(); render(); return; }
+  if(ehCliente()){ try{ S.portal = await api.portal(); }catch(e){ S.portal = null; } view = "portal"; L.entrando = false; montarShell(); render();
+    clearInterval(PT.timer); PT.timer = setInterval(async()=>{ if(!ehCliente() || document.hidden || modal) return; const ae = document.activeElement; if(ae && /TEXTAREA|INPUT/.test(ae.tagName) && ae.value) return; try{ S.portal = await api.portal(); render(); }catch(e){} }, 30000);
+    return; }
   view = "inicio";
   await Promise.all(P.TABELAS.map(t=>recarregar(t, true)));
   if(pode("gerenciar_equipe")) await recarregar("convites", true);
@@ -138,6 +144,7 @@ function filtrar(){
   const ids = new Set(S.processos.map(p=>p.id));
   S.andamentos = (RAW.andamentos||[]).filter(a=>ids.has(a.processo_id));
   S.documentos = (RAW.documentos||[]).filter(a=>ids.has(a.processo_id));
+  S.mensagens = (RAW.mensagens||[]).filter(a=>ids.has(a.processo_id));
   const cli = new Set(S.processos.map(p=>p.cliente_id));
   S.clientes = (RAW.clientes||[]).filter(c=> pode("gerenciar_clientes") || todos || cli.has(c.id));
   S.revisoes = pode("revisar_minutas") ? (RAW.revisoes||[]) : [];
@@ -382,7 +389,8 @@ function render(dados){
   $("#me-av").textContent = P.iniciais(S.perfil.nome); $("#me-nome").textContent = S.perfil.nome || ""; $("#me-papel").textContent = P.PAPEIS[S.perfil.papel] || "";
   const atr = S.tarefas.filter(t=>!t.done && t.data && t.data<hoje() && (escopoAgenda==="todos" || t.atribuido_a===meuId())).length;
   const pend = pode("gerenciar_equipe") ? S.pedidos.length : 0;
-  const badge = k => k==="agenda" && atr ? `<span class="badge" title="Prazos vencidos">${atr}</span>` : k==="equipe" && pend ? `<span class="badge" title="Pedidos de acesso">${pend}</span>` : "";
+  const novCli = S.processos.reduce((n,p)=>{ const v = novidadesCliente(p.id); return n + v.msgs + v.docs; }, 0);
+  const badge = k => k==="processos" && novCli ? `<span class="badge" title="Mensagens e documentos novos do cliente">${novCli}</span>` : k==="agenda" && atr ? `<span class="badge" title="Prazos vencidos">${atr}</span>` : k==="equipe" && pend ? `<span class="badge" title="Pedidos de acesso">${pend}</span>` : "";
   $("#nav").innerHTML = `<span class="ind"></span>` + nav.map(([k,l])=>`<button class="navbtn" data-act="nav" data-v="${k}" aria-current="${view===k}">${ICON[k]}<span>${l}</span>${badge(k)}</button>`).join("");
   const tb = ehCliente() ? [["portal","Processos"],["perfil","Conta"]] : [["inicio","Início"],["agenda","Agenda"],["processos","Processos"],["assistente","Assistente"],["mais","Mais"]];
   const extra = nav.map(([k])=>k).filter(k=>!tb.some(([x])=>x===k));
@@ -569,7 +577,8 @@ function vProcessos(){
   <div class="panel">${!S.processos.length?`<div class="empty"><h2>Nenhum processo</h2><p>${pode("editar_processos")?"Cadastre o primeiro processo com o número no padrão CNJ. O app confere o dígito verificador e identifica o ramo da Justiça.":"Os processos aparecem aqui quando você for responsável ou receber uma atividade."}</p>${pode("editar_processos")?`<button class="btn primary" data-act="novo-processo">${ICON.plus}Cadastrar processo</button>`:""}</div>`:!ps.length?`<div class="empty"><p>Nenhum processo com esse filtro.</p></div>`:`
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Processo</th><th>Cliente</th><th>Parte contrária</th><th>Fase</th><th>Próximo compromisso</th><th>Responsável</th></tr></thead><tbody>
   ${ps.map(p=>{ const nx = proximo(p.id), h = hoje();
-    return `<tr data-act="abrir-processo" data-id="${p.id}"><td><div class="mono">${esc(p.numero||"sem número")}</div><div class="row" style="gap:6px;margin-top:3px">${chipArea(p.area)}<span class="small muted">${esc(p.vara||"")}</span></div></td>
+    const nv = novidadesCliente(p.id);
+    return `<tr data-act="abrir-processo" data-id="${p.id}"><td><div class="mono">${esc(p.numero||"sem número")}</div>${nv.msgs||nv.docs?`<div class="row" style="gap:6px;margin-top:3px">${nv.msgs?`<span class="chip warn">${nv.msgs} mensagem(ns) do cliente</span>`:""}${nv.docs?`<span class="chip warn">${nv.docs} documento(s) novo(s)</span>`:""}</div>`:""}<div class="row" style="gap:6px;margin-top:3px">${chipArea(p.area)}<span class="small muted">${esc(p.vara||"")}</span></div></td>
     <td>${esc(nomeCliente(p))}</td><td>${esc(p.parte_contraria||"—")}</td><td><span class="chip neutral">${esc(p.fase||"—")}</span></td>
     <td>${nx?`<span class="${nx.data<h?"chip danger":nx.data<=iso(addDays(new Date(),3))?"chip warn":""}">${fmt(nx.data)}</span><div class="small muted">${esc(nx.titulo||nx.tipo)}</div>`:`<span class="muted">—</span>`}</td><td>${esc(P.primeiroNome(nomePerfil(p.responsavel_id))||"—")}</td></tr>`; }).join("")}
   </tbody></table></div>`}</div>`;
@@ -1385,6 +1394,7 @@ const caminhoProcesso = (pid, nome) => `${S.perfil?.escritorio_id || S.escritori
 const nomeArquivo = n => String(n||"arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w.\-]+/g,"_").slice(-80);
 
 /* ---------- PORTAL DO CLIENTE (resumido) ---------- */
+const PT = {aba:{}};
 function vPortal(){
   const pt = S.portal;
   if(!pt) return `<div class="panel"><div class="empty"><span class="spinner"></span><p>Carregando seus processos…</p></div></div>`;
@@ -1403,27 +1413,35 @@ function vPortal(){
         <div class="row" style="gap:6px">${waLink(ct.telefone, msgWa(ps[0]))?`<a class="btn" href="${waLink(ct.telefone, msgWa(ps[0]))}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>`:""}${ct.telefone?`<a class="btn" href="tel:${esc(ct.telefone.replace(/[^\d+]/g,""))}">Ligar</a>`:""}${ct.email?`<a class="btn" href="mailto:${esc(ct.email)}">${ICON.mail}E-mail</a>`:""}</div></div>`:""}
       ${!advs.length && !ct.telefone && !ct.email?`<span class="small muted">O escritório ainda não cadastrou o contato. Responda à mensagem em que recebeu o link de acesso.</span>`:""}
     </div></div>`;
-  const evPortal = a => `<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div>${a.arquivo?`<button class="anexo" data-act="ver-arquivo" data-c="${esc(a.arquivo)}">${ICON.pdf}<span>${esc(a.arquivo_nome||"Abrir documento")}</span></button>`:""}</div>`;
-  const docsProc = ps.flatMap(p=>[].concat((p.andamentos||[]).filter(a=>a.arquivo).map(a=>({nome:a.arquivo_nome||a.texto, data:a.data, caminho:a.arquivo, p})), (p.documentos||[]).filter(d=>d.caminho && d.status!=="Aguardando cliente").map(d=>({nome:d.nome, data:d.data, caminho:d.caminho, p}))));
+  const evPortal = a => `<div class="ev"><div class="small muted mono">${fmt(a.data)}</div><div>${esc(a.texto)}</div></div>`;
   const etapa = f => Math.max(0, ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento"].indexOf(f));
-  const card = p => { const pd = (p.documentos||[]).filter(d=>d.status==="Aguardando cliente"); const and = p.andamentos||[];
+  const card = p => { const docs = p.documentos||[], pd = docs.filter(d=>d.status==="Aguardando cliente"), meus = docs.filter(d=>d.status==="Enviado pelo cliente"||d.status==="Recebido"), doEsc = docs.filter(d=>d.caminho && !pd.includes(d) && !meus.includes(d)).map(d=>({nome:d.nome, data:d.data, caminho:d.caminho})).concat(p.anexos||[]).sort((x,y)=>(y.data||"").localeCompare(x.data||""));
+    const and = p.andamentos||[], msgs = p.mensagens||[], novas = msgs.filter(m=>!m.de_cliente && !m.lida).length;
+    const aba = PT.aba[p.id] || "andamento";
+    const tab = (k,l,n,alerta) => `<button role="tab" aria-selected="${aba===k}" data-act="pt-aba" data-p="${p.id}" data-a="${k}">${l}${n?` <span class="${alerta?"dot-novo":"cnt"}">${n}</span>`:""}</button>`;
+    let corpo = "";
+    if(aba==="andamento") corpo = and.length ? `<div class="timeline">${and.slice(0,6).map(evPortal).join("")}</div>${and.length>6?`<details><summary class="small gold" style="cursor:pointer;margin-top:6px">Ver todas (${and.length})</summary><div class="timeline" style="margin-top:8px">${and.slice(6).map(evPortal).join("")}</div></details>`:""}` : `<div class="small muted">Ainda não há movimentações para mostrar.</div>`;
+    if(aba==="documentos") corpo = `${pd.length?`<div class="pend"><b>O escritório precisa destes documentos:</b>${pd.map(d=>`<div class="pend-i"><span>${esc(d.nome)}</span><label class="btn primary">${ICON.plus}Enviar<input type="file" hidden data-file="portal-doc" data-doc="${d.id}" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>`).join("")}</div>`:""}
+      <div class="doc-sec"><div class="doc-sec-h"><b>Enviar outro documento</b></div><div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="pn-${p.id}" placeholder="Nome do documento. Ex.: comprovante de endereço" style="flex:1"><label class="btn">${ICON.plus}Escolher arquivo<input type="file" hidden data-file="portal-novo" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div></div>
+      <div class="doc-sec"><div class="doc-sec-h"><b>Enviados por você</b><span class="small muted">${meus.length||""}</span></div>${meus.length?meus.map(d=>`<div class="pt-doc"><span>${esc(d.nome)}<span class="small muted mono"> · ${fmt(d.data)}</span></span><span class="row" style="gap:8px">${d.caminho?`<button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.caminho)}">Abrir</button>`:""}<span class="chip ${d.status==="Recebido"?"ok":"neutral"}">${d.status==="Recebido"?"Recebido pelo escritório":"Enviado"}</span></span></div>`).join(""):`<span class="small muted">Você ainda não enviou documentos.</span>`}</div>
+      <div class="doc-sec"><div class="doc-sec-h"><b>Do escritório</b><span class="small muted">${doEsc.length||""}</span></div>${doEsc.length?doEsc.map(d=>`<button class="anexo" data-act="ver-arquivo" data-c="${esc(d.caminho)}">${ICON.pdf}<span style="flex:1;text-align:left">${esc(d.nome)}</span><span class="small muted mono">${fmt(d.data)}</span></button>`).join(""):`<span class="small muted">Nenhum arquivo compartilhado ainda.</span>`}</div>`;
+    if(aba==="mensagens") corpo = `<div class="chat-proc">${msgs.length?msgs.map(m=>`<div class="msg ${m.de_cliente?"esc":"cli"}"><div class="msg-b">${esc(m.texto).replace(/\n/g,"<br>")}</div><div class="msg-m">${m.de_cliente?"Você":esc(m.autor||"Escritório")} · ${new Date(m.criado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}${m.de_cliente?(m.lida?" · lida":" · enviada"):""}</div></div>`).join(""):`<div class="small muted">Escreva sua dúvida sobre este processo. A resposta do escritório aparece aqui.</div>`}</div>
+      <div class="chat-in"><textarea id="pm-${p.id}" rows="2" placeholder="Escreva sua mensagem"></textarea><button class="btn primary" data-act="pt-msg" data-p="${p.id}">${ICON.send}Enviar</button></div>`;
     return `<div class="panel portal-proc"><div class="panel-b" style="display:flex;flex-direction:column;gap:14px">
       <div class="row" style="justify-content:space-between"><div style="min-width:0"><div class="mono small muted">${esc(p.numero||"")}</div><b style="font-size:1.05rem">${p.parte_contraria?"× "+esc(p.parte_contraria):esc(AREAS[p.area]?.nome||"Processo")}</b></div>${chipArea(p.area)}</div>
       <div><div class="small muted">Fase atual</div><b class="gold">${esc(p.fase||"—")}</b>${["Acordo","Suspenso","Arquivado"].includes(p.fase)?"":`<div class="steps" style="margin-top:8px">${[0,1,2,3,4].map(i=>`<i class="${i<=etapa(p.fase)?"on":""}"></i>`).join("")}</div>`}</div>
       ${p.resumo?`<div class="notice" style="font-size:.95rem;color:var(--ink)">${esc(p.resumo)}</div>`:""}
       ${(p.audiencias||[]).length?`<div class="small"><b>Próxima audiência:</b> ${fmt(p.audiencias[0].data)}${p.audiencias[0].hora?" às "+esc(p.audiencias[0].hora):""} · ${esc(p.audiencias[0].modalidade||"")} ${p.audiencias[0].local?"· "+esc(p.audiencias[0].local):""}</div>`:""}
-      ${pd.length?`<div class="pend"><b>O escritório precisa destes documentos:</b>${pd.map(d=>`<div class="pend-i"><span>${esc(d.nome)}</span><label class="btn primary">${ICON.plus}Enviar<input type="file" hidden data-file="portal-doc" data-doc="${d.id}" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>`).join("")}</div>`:""}
-      <div><b class="small">Últimas movimentações</b>${and.length?`<div class="timeline" style="margin-top:8px">${and.slice(0,3).map(evPortal).join("")}</div>${and.length>3?`<details><summary class="small gold" style="cursor:pointer;margin-top:6px">Ver todas (${and.length})</summary><div class="timeline" style="margin-top:8px">${and.slice(3).map(evPortal).join("")}</div></details>`:""}`:`<div class="small muted" style="margin-top:6px">Ainda não há movimentações para mostrar.</div>`}</div>
-      ${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length?`<details><summary class="small muted" style="cursor:pointer">Documentos já entregues (${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").length})</summary>${(p.documentos||[]).filter(d=>d.status!=="Aguardando cliente").map(d=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>${esc(d.nome)}</span><span class="row" style="gap:8px">${d.caminho?`<button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.caminho)}">Abrir</button>`:""}<span class="chip ok">${esc(d.status)}</span></span></div>`).join("")}</details>`:""}
-      <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="pn-${p.id}" placeholder="Enviar outro documento: escreva o nome" style="flex:1"><label class="btn">${ICON.plus}Arquivo<input type="file" hidden data-file="portal-novo" data-proc="${p.id}" accept="image/*,.pdf,.doc,.docx"></label></div>
+      <div class="seg pt-tabs" role="tablist">${tab("andamento","Andamento",and.length)}${tab("documentos","Documentos",pd.length,true)}${tab("mensagens","Mensagens",novas,true)}</div>
+      <div class="pt-corpo">${corpo}</div>
       <button class="linkbtn small" data-act="pdf-portal" data-id="${p.id}" style="align-self:flex-start">Baixar resumo em PDF</button>
     </div></div>`; };
+  const novasTot = ps.reduce((n,p)=>n+(p.mensagens||[]).filter(m=>!m.de_cliente && !m.lida).length, 0);
   return `<div class="portal-hero">${pt.logo?`<img class="logo-esc" src="${pt.logo}" alt="${esc(pt.escritorio||"")}">`:`<span class="small gold" style="text-transform:uppercase;letter-spacing:.12em;font-weight:600">${esc(pt.escritorio)}</span>`}
     <h1>Olá, ${esc(P.primeiroNome(pt.cliente||S.perfil.nome))}</h1>
-    <div class="portal-kpis"><div><b>${ps.length}</b><span>processo(s)</span></div><div><b>${auds[0]?fmtCurto(auds[0].data):"—"}</b><span>próxima audiência</span></div><div class="${pend.length?"alerta":""}"><b>${pend.length}</b><span>documento(s) para enviar</span></div></div></div>
+    <div class="portal-kpis"><div><b>${ps.length}</b><span>processo(s)</span></div><div><b>${auds[0]?fmtCurto(auds[0].data):"—"}</b><span>próxima audiência</span></div><div class="${pend.length?"alerta":""}"><b>${pend.length}</b><span>documento(s) para enviar</span></div><div class="${novasTot?"alerta":""}"><b>${novasTot}</b><span>mensagem(ns) nova(s)</span></div></div></div>
     <div class="portal-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">${ps.length?ps.map(card).join(""):`<div class="panel"><div class="empty"><p>Nenhum processo vinculado ao seu cadastro.</p></div></div>`}</div><div class="portal-lado">${contatos}
-      ${docsProc.length?`<div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:8px"><h2 style="font-size:1.05rem;margin:0">Documentos do escritório</h2>
-        ${docsProc.sort((x,y)=>(y.data||"").localeCompare(x.data||"")).slice(0,12).map(d=>`<button class="anexo" data-act="ver-arquivo" data-c="${esc(d.caminho)}">${ICON.pdf}<span style="flex:1;text-align:left">${esc(d.nome)}</span><span class="small muted mono">${fmt(d.data)}</span></button>`).join("")}</div></div>`:""}</div></div>`;
+</div></div>`;
 }
 async function enviarPortal(tipo, file, el){
   if(!file) return;
@@ -2562,6 +2580,10 @@ async function salvarProcesso(){
   }catch(e){ toast(P.erroAmigavel(e)); }
 }
 
+async function marcarLidas(pid){
+  const nl = msgsDe(pid).filter(m=>m.de_cliente && !m.lida_escritorio_em); if(!nl.length) return;
+  try{ for(const m of nl){ await api.atualizar("mensagens", m.id, {lida_escritorio_em:new Date().toISOString()}); m.lida_escritorio_em = new Date().toISOString(); } render(); }catch(e){}
+}
 function mDetalhe(m){
   const p = procById(m.id); if(!p) return cab("Processo indisponível") + `<div class="sheet-b"><p class="muted">Este processo foi excluído ou você não tem mais acesso a ele.</p></div>`;
   const aba = m.aba || "resumo";
@@ -2569,7 +2591,9 @@ function mDetalhe(m){
   const and = andamentosDe(p.id), docs = docsDe(p.id), coms = S.comunicacoes.filter(c=>c.processo_id===p.id).sort((a,b)=>(b.enviado_em||"").localeCompare(a.enviado_em||""));
   const podeReg = pode("editar_processos") || pode("registrar_andamentos");
   const info = P.cnjInfo(p.numero);
-  const abas = [["resumo","Resumo"],["prazos","Prazos "+ts.filter(t=>!t.done).length],["andamentos","Andamentos "+and.length],["documentos","Documentos "+docs.length]].concat(pode("enviar_cliente")?[["envios","Mensagens "+coms.length]]:[]);
+  const msgs = msgsDe(p.id), nov = novidadesCliente(p.id), podeMsg = pode("enviar_cliente") && podeAlterarProc(p);
+  const anexosAnd = and.filter(a=>a.arquivo);
+  const abas = [["resumo","Resumo"],["prazos","Prazos "+ts.filter(t=>!t.done).length],["andamentos","Andamentos "+and.length],["documentos","Documentos "+(docs.length+anexosAnd.length)+(nov.docs?` <span class="dot-novo" title="Enviado pelo cliente">${nov.docs}</span>`:"")],["mensagens","Mensagens"+(nov.msgs?` <span class="dot-novo" title="Não lidas">${nov.msgs}</span>`:msgs.length?" "+msgs.length:"")]];
   let corpo = "";
   if(aba==="resumo") corpo = `<dl class="kv"><div><dt>Cliente</dt><dd>${esc(nomeCliente(p))}${p.polo?`<div class="small muted">${esc(p.polo)}</div>`:""}</dd></div><div><dt>Parte contrária</dt><dd>${esc(p.parte_contraria||"—")}</dd></div><div><dt>Vara / tribunal</dt><dd>${esc(p.vara||"—")}</dd></div>
       <div><dt>Responsável</dt><dd>${esc(nomePerfil(p.responsavel_id)||"—")}</dd></div><div><dt>Valor da causa</dt><dd>${esc(p.valor||"—")}</dd></div><div><dt>Atualizado</dt><dd>${p.atualizado_em?new Date(p.atualizado_em).toLocaleDateString("pt-BR"):"—"}</dd></div></dl>
@@ -2578,13 +2602,26 @@ function mDetalhe(m){
   if(aba==="prazos") corpo = `<div class="row" style="justify-content:flex-end">${pode("criar_tarefas")?`<button class="btn" data-act="nova-tarefa" data-tipo="Audiência" data-proc="${p.id}">${ICON.plus}Audiência</button><button class="btn" data-act="nova-tarefa" data-tipo="Peça" data-proc="${p.id}">${ICON.plus}Tarefa</button>`:""}<button class="btn primary" data-act="nova-tarefa" data-tipo="${pode("criar_tarefas")?"Prazo":"Peça"}" data-proc="${p.id}">${ICON.plus}${pode("criar_tarefas")?"Prazo":"Atividade"}</button></div>
     <div class="panel"><div class="pauta">${ts.length?ts.map(itemTarefa).join(""):`<div class="empty small">Nenhum compromisso neste processo.</div>`}</div></div>`;
   if(aba==="andamentos") corpo = `${podeReg?`<div class="calc dj-box">${blocoDataJud(p)}</div>`:""}${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="date" id="and-data" value="${hoje()}" style="width:auto"><input type="text" id="and-txt" placeholder="Ex.: Juntada de contestação"><button class="btn primary" data-act="add-andamento" data-id="${p.id}">Incluir</button></div>
-      <div class="row" style="justify-content:space-between;gap:8px"><label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label><label class="btn ghost small-btn" style="cursor:pointer">${ICON.plus}<span id="and-arq-n">Anexar documento</span><input type="file" id="and-arq" hidden accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label></div></div>`:""}
-    ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span>${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</div><div>${esc(a.texto)}</div>${a.arquivo?`<button class="anexo" data-act="ver-arquivo" data-c="${esc(a.arquivo)}">${ICON.pdf}<span>${esc(a.arquivo_nome||"Documento anexo")}</span></button>`:""}${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button>${podeReg?`<label class="linkbtn small" style="cursor:pointer">${a.arquivo?"Trocar anexo":"Anexar documento"}<input type="file" hidden data-file="and-anexo" data-id="${a.id}" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label>`:""}<button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
-  if(aba==="documentos") corpo = `${podeReg?`<div class="calc"><div class="row" style="flex-wrap:nowrap"><input type="text" id="doc-nome" placeholder="Ex.: Procuração, CTPS, contrato"><button class="btn primary" data-act="add-doc" data-id="${p.id}">Incluir</button></div><label class="check"><input type="checkbox" id="doc-vis" checked> Visível para o cliente (ele vê que o documento é necessário)</label></div>`:""}
-    <div class="doclist">${docs.length?docs.map(d=>`<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}${d.status==="Enviado pelo cliente"?` <span class="chip warn">novo</span>`:""}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}${d.arquivo?` · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.arquivo)}">Ver arquivo</button>`:""}${podeReg?` · <label class="linkbtn small" style="cursor:pointer">${d.arquivo?"Trocar arquivo":"Anexar arquivo"}<input type="file" hidden data-file="doc-anexo" data-id="${d.id}" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label>`:""}</div></div><select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`).join(""):`<span class="small muted">Nenhum documento listado.</span>`}</div>`;
-  if(aba==="envios") corpo = coms.length?`<div class="timeline">${coms.map(c=>`<div class="ev"><div class="small muted">${new Date(c.enviado_em||c.criado_em).toLocaleString("pt-BR")} · ${esc(nomePerfil(c.enviado_por||c.criado_por))}</div><div class="pre" style="max-height:140px;margin-top:4px">${esc(c.texto||"")}</div></div>`).join("")}</div>`:`<span class="small muted">Nenhuma mensagem preparada para este processo.</span>`;
+      <div class="row" style="justify-content:space-between;gap:8px"><label class="check"><input type="checkbox" id="and-vis" checked> Visível para o cliente no portal</label><span class="small muted">Arquivos e documentos ficam na aba Documentos.</span></div></div>`:""}
+    ${and.length?`<div class="timeline">${and.map(a=>`<div class="ev"><div class="row" style="justify-content:space-between"><span class="small muted mono">${fmt(a.data)}</span>${a.visivel_cliente?`<span class="chip ok">Cliente vê</span>`:`<span class="chip neutral">Interno</span>`}</div><div>${esc(a.texto)}</div>${pode("editar_processos")?`<div class="row" style="margin-top:4px"><button class="linkbtn small" data-act="and-vis" data-id="${a.id}">${a.visivel_cliente?"Ocultar do cliente":"Mostrar ao cliente"}</button><button class="linkbtn small" style="color:var(--danger)" data-act="del-and" data-id="${a.id}">Excluir</button></div>`:""}</div>`).join("")}</div>`:`<span class="small muted">Nenhum andamento registrado.</span>`}`;
+  if(aba==="documentos"){
+    const recebidos = docs.filter(d=>d.status==="Enviado pelo cliente" || (d.status==="Recebido" && d.arquivo)), pedidos = docs.filter(d=>d.status==="Aguardando cliente"), outros = docs.filter(d=>!recebidos.includes(d) && !pedidos.includes(d));
+    const linhaDoc = (d, extra) => `<div class="doc"><div style="min-width:0"><div>${esc(d.nome)}${d.status==="Enviado pelo cliente"?` <span class="chip warn">novo</span>`:""}</div><div class="small muted">${fmt(d.data)} · ${d.visivel_cliente?"cliente vê":"interno"}${d.arquivo?` · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(d.arquivo)}">Abrir arquivo</button>`:""}${podeReg?` · <label class="linkbtn small" style="cursor:pointer">${d.arquivo?"Trocar arquivo":"Anexar arquivo"}<input type="file" hidden data-file="doc-anexo" data-id="${d.id}" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label>`:""}</div></div>${extra||""}<select data-act="doc-status" data-id="${d.id}" ${podeReg?"":"disabled"} aria-label="Situação">${opts(DOC_STATUS,d.status)}</select>${podeReg?`<button class="linkbtn small" data-act="doc-vis" data-id="${d.id}">${d.visivel_cliente?"Ocultar":"Mostrar"}</button>`:"<span></span>"}${pode("editar_processos")?`<button class="icon-btn" data-act="del-doc" data-id="${d.id}" aria-label="Remover">${ICON.x}</button>`:"<span></span>"}</div>`;
+    const sec = (titulo, sub, itens) => `<div class="doc-sec"><div class="doc-sec-h"><b>${titulo}</b><span class="small muted">${sub}</span></div>${itens}</div>`;
+    corpo = `${podeReg?`<div class="calc doc-acoes"><div class="row" style="flex-wrap:nowrap"><input type="text" id="doc-nome" placeholder="Nome do documento. Ex.: Procuração, CTPS, comprovante de endereço"><button class="btn" data-act="add-doc" data-id="${p.id}">Pedir ao cliente</button><label class="btn primary" style="cursor:pointer">${ICON.plus}Enviar arquivo<input type="file" hidden data-file="doc-novo" data-proc="${p.id}" accept=".pdf,.doc,.docx,image/*,.xls,.xlsx"></label></div><label class="check"><input type="checkbox" id="doc-vis" checked> Visível para o cliente no portal</label></div>`:""}
+    ${sec("Recebidos do cliente", recebidos.length?`${recebidos.length} arquivo(s)`:"O que o cliente enviar pelo portal aparece aqui", `<div class="doclist">${recebidos.length?recebidos.map(d=>linhaDoc(d)).join(""):`<span class="small muted">Nada recebido ainda.</span>`}</div>`)}
+    ${sec("Pedidos ao cliente", pedidos.length?`${pedidos.length} aguardando`:"Nenhum pendente", pedidos.length?`<div class="doclist">${pedidos.map(d=>linhaDoc(d)).join("")}</div>`:"")}
+    ${sec("Arquivos do escritório", "Peças, decisões e documentos do processo", `<div class="doclist">${outros.map(d=>linhaDoc(d)).join("")}${anexosAnd.map(a=>`<div class="doc"><div style="min-width:0"><div>${esc(a.arquivo_nome||"Documento")}</div><div class="small muted">${fmt(a.data)} · anexo do andamento "${esc((a.texto||"").slice(0,60))}" · <button class="linkbtn small" data-act="ver-arquivo" data-c="${esc(a.arquivo)}">Abrir arquivo</button></div></div><span></span><span></span><span></span></div>`).join("")}${!outros.length&&!anexosAnd.length?`<span class="small muted">Nenhum arquivo do escritório.</span>`:""}</div>`)}`;
+  }
+  if(aba==="mensagens"){
+    const bolha = m => `<div class="msg ${m.de_cliente?"cli":"esc"}"><div class="msg-b">${esc(m.texto).replace(/\n/g,"<br>")}</div><div class="msg-m">${esc(m.de_cliente?(m.autor_nome||nomeCliente(p)):(nomePerfil(m.autor_id||m.criado_por)||"Escritório"))} · ${new Date(m.criado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}${!m.de_cliente?(m.lida_cliente_em?" · lida":" · enviada"):""}</div></div>`;
+    corpo = `<div class="chat-proc">${msgs.length?msgs.map(bolha).join(""):`<div class="empty small"><p>Nenhuma mensagem ainda. O cliente escreve pelo portal, e a resposta aparece para ele lá.</p></div>`}</div>
+    ${podeMsg?`<div class="chat-in"><textarea id="msg-txt" rows="2" placeholder="Escreva para ${esc(P.primeiroNome(nomeCliente(p))||"o cliente")}. A mensagem aparece no portal dele."></textarea><button class="btn primary" data-act="msg-enviar" data-id="${p.id}">${ICON.send}Enviar</button></div>
+      <div class="row small" style="justify-content:space-between;gap:8px"><span class="muted">Prefere WhatsApp ou e-mail?</span><button class="linkbtn small" data-act="comunicar" data-id="${p.id}">Preparar atualização por WhatsApp ou e-mail</button></div>`:`<span class="small muted">Só o responsável pelo processo e o gestor respondem.</span>`}
+    ${coms.length?`<details class="small"><summary class="muted" style="cursor:pointer">Atualizações enviadas por WhatsApp/e-mail (${coms.length})</summary><div class="timeline" style="margin-top:8px">${coms.map(c=>`<div class="ev"><div class="small muted">${new Date(c.enviado_em||c.criado_em).toLocaleString("pt-BR")} · ${esc(nomePerfil(c.enviado_por||c.criado_por))} · ${esc(c.canal||"")}</div><div class="pre" style="max-height:140px;margin-top:4px">${esc(c.texto||"")}</div></div>`).join("")}</div></details>`:""}`;
+  }
   return cab(`<span class="mono" style="font-size:1.05rem">${esc(p.numero||"Processo sem número")}</span>`, `${chipArea(p.area)} <span class="chip neutral">${esc(p.fase||"")}</span> ${info.completo?esc(info.segmento):""}`) + `<div class="sheet-b">
-    <div class="row">${pode("enviar_cliente")?`<button class="btn primary" data-act="comunicar" data-id="${p.id}">${ICON.send}Mensagem ao cliente</button>`:""}${podeReg?`<button class="btn" data-act="ler-pdf" data-proc="${p.id}">${ICON.scan}Ler PDF</button>`:""}${pode("gerar_relatorios")?`<button class="btn" data-act="pdf-processo" data-id="${p.id}">${ICON.pdf}PDF</button>`:""}${pode("editar_processos")?`<button class="btn ghost" data-act="editar-processo" data-id="${p.id}">Editar</button>`:""}</div>
+    <div class="row">${pode("enviar_cliente")?`<button class="btn primary" data-act="comunicar" data-id="${p.id}">${ICON.send}Atualizar cliente por WhatsApp</button>`:""}${podeReg?`<button class="btn" data-act="ler-pdf" data-proc="${p.id}">${ICON.scan}Ler PDF</button>`:""}${pode("gerar_relatorios")?`<button class="btn" data-act="pdf-processo" data-id="${p.id}">${ICON.pdf}PDF</button>`:""}${pode("editar_processos")?`<button class="btn ghost" data-act="editar-processo" data-id="${p.id}">Editar</button>`:""}</div>
     <div class="tabs" role="tablist"><span class="ind"></span>${abas.map(([k,l])=>`<button role="tab" aria-selected="${aba===k}" data-act="aba" data-a="${k}">${l}</button>`).join("")}</div>
     ${corpo}</div>`;
 }
@@ -2697,7 +2734,7 @@ document.addEventListener("click", async e => {
     case "escopo": escopoAgenda = el.dataset.e; render(); break;
     case "rolar": $("#g-pauta")?.scrollIntoView({behavior:"smooth"}); break;
     case "toggle-feitas": verConcluidas = !verConcluidas; render(); break;
-    case "aba": modal.aba = el.dataset.a; abrirModal(modal); break;
+    case "aba": modal.aba = el.dataset.a; abrirModal(modal); if(modal.aba==="mensagens") marcarLidas(modal.id); break;
     case "fechar": fecharModal(); break;
     /* atividades */
     case "tick": { if(!S.tarefas.find(x=>x.id===id)) return; try{ await api.atualizar("tarefas", id, {done:el.checked, concluido_em: el.checked ? new Date().toISOString() : null}); if(el.checked) toast("Concluído"); agendarRecarga("tarefas"); }catch(err){ el.checked = !el.checked; toast(P.erroAmigavel(err)); } break; }
@@ -2719,6 +2756,11 @@ document.addEventListener("click", async e => {
         await api.inserir("andamentos", row); agendarRecarga("andamentos"); toast(f ? "Andamento e documento registrados" : "Andamento registrado"); }); el.disabled = false; break; }
     case "and-vis": { const x = S.andamentos.find(y=>y.id===id); await comErro(async()=>{ await api.atualizar("andamentos", id, {visivel_cliente:!x.visivel_cliente}); agendarRecarga("andamentos"); }); break; }
     case "del-and": await comErro(async()=>{ await api.excluir("andamentos", id); agendarRecarga("andamentos"); }); break;
+    case "pt-aba": { PT.aba[el.dataset.p] = el.dataset.a; render(); if(el.dataset.a==="mensagens"){ const pp = (S.portal?.processos||[]).find(x=>x.id===el.dataset.p); if(pp && (pp.mensagens||[]).some(m=>!m.de_cliente && !m.lida)){ try{ await api.rpc("cliente_ler_mensagens", {pid:el.dataset.p}); S.portal = await api.portal(); render(); }catch(e){} } } break; }
+    case "pt-msg": { const pid = el.dataset.p, ta = $("#pm-"+pid), tx = (ta?.value||"").trim(); if(!tx){ toast("Escreva a mensagem."); ta?.focus(); return; }
+      el.disabled = true; try{ await api.rpc("cliente_enviar_mensagem", {pid, p_texto:tx}); S.portal = await api.portal(); PT.aba[pid] = "mensagens"; render(); toast("Mensagem enviada ao escritório"); }catch(e){ toast(P.erroAmigavel(e)); el.disabled = false; } break; }
+    case "msg-enviar": { const tx = ($("#msg-txt")?.value||"").trim(); if(!tx){ toast("Escreva a mensagem."); $("#msg-txt")?.focus(); return; }
+      el.disabled = true; await comErro(async()=>{ await api.inserir("mensagens", {processo_id:id, texto:tx, de_cliente:false, autor_id:meuId()}); agendarRecarga("mensagens"); toast("Mensagem enviada ao portal do cliente"); }); el.disabled = false; break; }
     case "add-doc": { const nome = $("#doc-nome").value.trim(); if(!nome) return; await comErro(async()=>{ await api.inserir("documentos", {processo_id:id, nome, status:"Aguardando cliente", data:hoje(), visivel_cliente:$("#doc-vis").checked}); agendarRecarga("documentos"); }); break; }
     case "doc-vis": { const x = S.documentos.find(y=>y.id===id); await comErro(async()=>{ await api.atualizar("documentos", id, {visivel_cliente:!x.visivel_cliente}); agendarRecarga("documentos"); }); break; }
     case "del-doc": await comErro(async()=>{ await api.excluir("documentos", id); agendarRecarga("documentos"); }); break;
@@ -2904,6 +2946,10 @@ document.addEventListener("change", async e => {
   if(el.id==="area-mais" && el.value){ filtroArea = el.value; render(); return; }
   if(el.id==="calc-area-sel"){ L.calc.area = el.value; mostrarInicio(); return; }
   if(el.id==="and-arq"){ const n = $("#and-arq-n"); if(n) n.textContent = el.files[0] ? "📎 "+el.files[0].name.slice(0,28) : "Anexar documento"; return; }
+  if(el.dataset.file==="doc-novo"){ const f = el.files[0]; if(!f) return; if(f.size > 10*1024*1024){ toast("Arquivo maior que 10 MB."); el.value=""; return; }
+    const nome = ($("#doc-nome")?.value||"").trim() || f.name.replace(/\.[^.]+$/,""); toast("Enviando…");
+    await comErro(async()=>{ const c = await api.enviarArquivo(caminhoProcesso(el.dataset.proc, f.name), f); await api.inserir("documentos", {processo_id:el.dataset.proc, nome, status:"Enviado pelo escritório", data:hoje(), visivel_cliente:$("#doc-vis")?.checked!==false, arquivo:c}); agendarRecarga("documentos"); toast("Arquivo enviado"); });
+    el.value = ""; return; }
   if(el.dataset.file==="and-anexo" || el.dataset.file==="doc-anexo"){ const f = el.files[0]; if(!f) return; if(f.size > 10*1024*1024){ toast("Arquivo maior que 10 MB."); el.value=""; return; }
     const col = el.dataset.file==="and-anexo" ? "andamentos" : "documentos"; toast("Enviando…");
     await comErro(async()=>{ const c = await api.enviarArquivo(caminhoProcesso(el.dataset.proc, f.name), f); await api.atualizar(col, el.dataset.id, col==="andamentos" ? {arquivo:c, arquivo_nome:f.name} : {arquivo:c}); agendarRecarga(col); toast("Documento anexado"); });

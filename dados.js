@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 const P = window.Pauta;
-const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos","financeiro","atendimentos"];
+const TABELAS = ["perfis","clientes","processos","andamentos","documentos","tarefas","revisoes","comunicacoes","modelos","financeiro","atendimentos","mensagens"];
 P.TABELAS = TABELAS;
 const agora = () => new Date().toISOString();
 const base = () => location.origin + location.pathname;
@@ -124,6 +124,11 @@ P.criarDemo = function(){
       {id:"d1", processo_id:PR.p1, nome:"Procuração", status:"Assinado", data:d(-90), visivel_cliente:true},
       {id:"d3", processo_id:PR.p2, nome:"Notas fiscais e fotos da mercadoria", status:"Aguardando cliente", data:d(-5), visivel_cliente:true}
     ],
+    mensagens:[
+      {id:"m1", processo_id:PR.p1, de_cliente:true, autor_id:U.cli, autor_nome:"João Batista Souza", texto:"Doutora, a audiência do dia 30 é presencial? Preciso levar algum documento?", criado_em:new Date(Date.now()-26*3600e3).toISOString(), lida_escritorio_em:new Date(Date.now()-25*3600e3).toISOString(), lida_cliente_em:new Date().toISOString()},
+      {id:"m2", processo_id:PR.p1, de_cliente:false, autor_id:U.gestor, texto:"Olá, João! Sim, é presencial, na 4ª Vara do Trabalho de Osasco. Leve um documento com foto. Chegue 30 minutos antes.", criado_em:new Date(Date.now()-24*3600e3).toISOString(), lida_cliente_em:new Date(Date.now()-20*3600e3).toISOString()},
+      {id:"m3", processo_id:PR.p1, de_cliente:true, autor_id:U.cli, autor_nome:"João Batista Souza", texto:"Combinado, obrigado! As testemunhas também precisam ir?", criado_em:new Date(Date.now()-2*3600e3).toISOString(), lida_cliente_em:new Date().toISOString()}
+    ],
     tarefas:[], revisoes:[], comunicacoes:[], modelos:[{id:"md1", tipo:"tema", area:"", titulo:"dano moral atraso de voo", texto:""}], financeiro:[], atendimentos:[{id:"at1", nome:"Carla Mendes", telefone:"(11) 95555-0101", email:"carla@email.com", area:"civel", relato:"Comprei um celular que parou de funcionar em 10 dias e a loja não quer trocar.", status:"novo", criado_em:new Date().toISOString()}]
   };
   const r1 = P.calcPrazo({inicio:d(-6), dias:15, contagem:"uteis", djen:false, suspende:true});
@@ -156,7 +161,7 @@ P.criarDemo = function(){
     async excluir(t, k){ db[t] = db[t].filter(x=>x.id!==k); if(t==="processos") ["tarefas","andamentos","documentos"].forEach(c=>db[c] = db[c].filter(x=>x.processo_id!==k)); avisar(t); },
     ouvir(cb){ cbs = [cb]; },
     async atualizarEscritorio(_, patch){ Object.assign(db.esc, patch); avisar("escritorios"); return Object.assign({}, db.esc); },
-    async portal(){ const p = db.perfis.find(x=>x.id===me); if(!p || !p.cliente_id) return {vinculado:false, escritorio:db.esc.nome}; const c = db.clientes.find(x=>x.id===p.cliente_id); return P.montarPortal({escritorio:db.esc, cliente:Object.assign({}, c, {portal_perm:p.permissoes}), processos:db.processos, andamentos:db.andamentos, documentos:db.documentos, tarefas:db.tarefas, perfis:db.perfis}); },
+    async portal(){ const p = db.perfis.find(x=>x.id===me); if(!p || !p.cliente_id) return {vinculado:false, escritorio:db.esc.nome}; const c = db.clientes.find(x=>x.id===p.cliente_id); return P.montarPortal({escritorio:db.esc, cliente:Object.assign({}, c, {portal_perm:p.permissoes}), processos:db.processos, andamentos:db.andamentos, documentos:db.documentos, tarefas:db.tarefas, perfis:db.perfis, mensagens:db.mensagens}); },
     async salvarPortal(){}, async removerPortal(){}, async pedidos(){ return []; },
     async convites(){ return db.convites.slice(); },
     async radar(tema){ return [{titulo:`Exemplo: tribunal julga caso sobre ${tema}`, link:"https://www.jusbrasil.com.br/jurisprudencia/busca?q="+encodeURIComponent(tema), fonte:"Demonstração", data:agora()}]; },
@@ -174,6 +179,8 @@ P.criarDemo = function(){
       return {};
     },
     async rpc(nome, a){
+      if(nome==="cliente_enviar_mensagem"){ const c = db.clientes.find(x=>x.id===(db.perfis.find(p=>p.id===me)||{}).cliente_id); db.mensagens.push({id:P.uid(), processo_id:a.pid, de_cliente:true, autor_id:me, autor_nome:c?.nome||"", texto:String(a.p_texto||"").trim(), criado_em:agora(), lida_cliente_em:agora()}); avisar("mensagens"); return true; }
+      if(nome==="cliente_ler_mensagens"){ db.mensagens.filter(m=>m.processo_id===a.pid && !m.de_cliente && !m.lida_cliente_em).forEach(m=>m.lida_cliente_em = agora()); return true; }
       if(nome==="cliente_enviar_documento"){ const doc = db.documentos.find(x=>x.id===a.doc); if(doc){ doc.arquivo = a.caminho; doc.status = "Enviado pelo cliente"; avisar("documentos"); } return true; }
       if(nome==="cliente_novo_documento"){ db.documentos.push({id:P.uid(), processo_id:a.pid, nome:a.p_nome||"Documento enviado", status:"Enviado pelo cliente", data:P.hoje(), visivel_cliente:true, arquivo:a.caminho}); avisar("documentos"); return true; }
       if(nome==="escritorio_publico") return {nome:db.esc.nome};
@@ -190,11 +197,13 @@ P.criarDemo = function(){
 };
 
 /* portal: usado pela demonstração */
-P.montarPortal = function({escritorio, cliente, processos, andamentos, documentos, tarefas, perfis}){
+P.montarPortal = function({escritorio, cliente, processos, andamentos, documentos, tarefas, perfis, mensagens}){
   const perm = cliente.portal_perm || {ver_documentos:true, ver_audiencias:true};
   return {vinculado:true, escritorio:escritorio?.nome||"", escritorio_id:escritorio?.id, logo:((escritorio?.config||{}).docs||{}).logo||"", contato:{telefone:"(11) 4000-1000", email:"contato@limareis.adv.br"}, cliente:cliente.nome,
     processos: processos.filter(p=>p.cliente_id===cliente.id).map(p=>({id:p.id, numero:p.numero||"", area:p.area, fase:p.fase||"", vara:p.vara||"", parte_contraria:p.parte_contraria||"", resumo:p.resumo_cliente||"", atualizado_em:p.atualizado_em||"", advogado:(()=>{ const a = (perfis||[]).find(u=>u.id===p.responsavel_id); return a ? {nome:a.nome, email:a.email, telefone:a.telefone||"(11) 98888-1234"} : null; })(),
-      andamentos: andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(a=>({data:a.data, texto:a.texto, arquivo:a.arquivo||null, arquivo_nome:a.arquivo_nome||null})),
+      andamentos: andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente && !/^Cliente enviou/.test(a.texto||"")).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(a=>({data:a.data, texto:a.texto})),
+      anexos: perm.ver_documentos===false ? [] : andamentos.filter(a=>a.processo_id===p.id && a.visivel_cliente && a.arquivo).map(a=>({nome:a.arquivo_nome||a.texto, data:a.data, caminho:a.arquivo})),
+      mensagens: (mensagens||[]).filter(m=>m.processo_id===p.id).sort((a,b)=>(a.criado_em||"").localeCompare(b.criado_em||"")).map(m=>({id:m.id, de_cliente:!!m.de_cliente, autor:m.autor_nome||((perfis||[]).find(u=>u.id===m.autor_id)||{}).nome||"", texto:m.texto, criado_em:m.criado_em, lida:m.de_cliente?!!m.lida_escritorio_em:!!m.lida_cliente_em})),
       documentos: perm.ver_documentos===false ? [] : documentos.filter(x=>x.processo_id===p.id && x.visivel_cliente).map(x=>({id:x.id, nome:x.nome, status:x.status, data:x.data, arquivo:!!x.arquivo, caminho:x.arquivo||null})),
       audiencias: perm.ver_audiencias===false ? [] : tarefas.filter(t=>t.processo_id===p.id && t.tipo==="Audiência" && !t.done && t.data>=P.hoje()).map(t=>({data:t.data, hora:t.hora||"", titulo:t.titulo||"", local:t.local||"", modalidade:t.modalidade||""}))}))};
 };

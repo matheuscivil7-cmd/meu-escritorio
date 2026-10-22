@@ -37,7 +37,7 @@ P.AREA_RE = [
 P.areaDoTexto = txt => { const n = String(txt||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); const r = P.AREA_RE.find(([,re])=>re.test(n)); return r ? r[0] : ""; };
 P.FASES = ["Inicial / conhecimento","Instrução","Sentença","Recurso","Execução / cumprimento","Acordo","Suspenso","Arquivado"];
 P.TIPOS = ["Prazo","Audiência","Peça","Diligência","Reunião"];
-P.DOC_STATUS = ["Rascunho","Aguardando cliente","Enviado pelo cliente","Recebido","Assinado","Protocolado"];
+P.DOC_STATUS = ["Rascunho","Aguardando cliente","Enviado pelo cliente","Recebido","Enviado pelo escritório","Assinado","Protocolado"];
 P.PAPEIS = {gestor:"Gestor", advogado:"Advogado(a)", estagiario:"Estagiário(a)", cliente:"Cliente"};
 P.PERMISSOES = [
   ["ver_todos_processos","Ver todos os processos","Sem isso, vê só os processos em que é responsável ou tem atividade atribuída."],
