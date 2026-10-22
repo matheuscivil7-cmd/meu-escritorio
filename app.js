@@ -85,8 +85,10 @@ const proximo = pid => S.tarefas.filter(t=>t.processo_id===pid && !t.done && t.d
 const ehEnvioCliente = a => !a.visivel_cliente && /^Cliente enviou/.test(a.texto||"");
 const msgsDe = pid => (S.mensagens||[]).filter(m=>m.processo_id===pid).sort((a,b)=>(a.criado_em||"").localeCompare(b.criado_em||""));
 const novidadesCliente = pid => ({msgs: msgsDe(pid).filter(m=>m.de_cliente && !m.lida_escritorio_em).length, docs: S.documentos.filter(d=>d.processo_id===pid && d.status==="Enviado pelo cliente").length});
-const avisoEmailAtivo = p => { const c = cliById(p?.cliente_id); return !!c && !!(c.email||"").trim() && (c.dados||{}).avisos_email!==false; };
-const seloEmail = a => { const v = (S.avisos_email||[]).find(x=>x.andamento_id===a.id); if(!v) return ""; const [t,c] = {pendente:["E-mail em até 10 min","neutral"], enviado:["E-mail enviado","ok"], erro:["E-mail não enviado","danger"], sem_email:["Cliente sem e-mail","warn"]}[v.status]||["",""]; return t?`<span class="chip ${c}" title="${esc(v.destino||"")}">${t}</span>`:""; };
+/* aviso por e-mail dos andamentos: suspenso por enquanto (ligar = true + reativar no banco) */
+const AVISOS_EMAIL = false;
+const avisoEmailAtivo = p => { if(!AVISOS_EMAIL) return false; const c = cliById(p?.cliente_id); return !!c && !!(c.email||"").trim() && (c.dados||{}).avisos_email!==false; };
+const seloEmail = a => { if(!AVISOS_EMAIL) return ""; const v = (S.avisos_email||[]).find(x=>x.andamento_id===a.id); if(!v) return ""; const [t,c] = {pendente:["E-mail em até 10 min","neutral"], enviado:["E-mail enviado","ok"], erro:["E-mail não enviado","danger"], sem_email:["Cliente sem e-mail","warn"]}[v.status]||["",""]; return t?`<span class="chip ${c}" title="${esc(v.destino||"")}">${t}</span>`:""; };
 const andamentosDe = pid => S.andamentos.filter(a=>a.processo_id===pid && !ehEnvioCliente(a)).sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criado_em||"").localeCompare(a.criado_em||""));
 const docsDe = pid => S.documentos.filter(a=>a.processo_id===pid).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
 const tarefasVisiveis = () => S.tarefas.filter(t=> escopoAgenda==="meus" ? t.atribuido_a===meuId() : true);
@@ -2366,7 +2368,7 @@ function mCliente(m){
     <label class="f span2">Representante legal (empresa)<input type="text" id="c-rep" value="${esc((c.dados||{}).representante||"")}" placeholder="Nome, cargo e CPF" ${ed?"":"disabled"}></label>
     <label class="f span2">Observações<textarea id="c-obs" rows="2" ${ed?"":"disabled"}>${esc(c.obs||"")}</textarea></label>
     ${campoAdvogado(c, m.id)}
-    <label class="check span2"><input type="checkbox" id="c-aviso" ${(c.dados||{}).avisos_email===false?"":"checked"} ${ed?"":"disabled"}> <span>Avisar o cliente por e-mail a cada novo andamento visível no portal${c.email?"":` <span class="small muted">(cadastre o e-mail acima para ativar)</span>`}</span></label></div>
+    ${AVISOS_EMAIL?`<label class="check span2"><input type="checkbox" id="c-aviso" ${(c.dados||{}).avisos_email===false?"":"checked"} ${ed?"":"disabled"}> <span>Avisar o cliente por e-mail a cada novo andamento visível no portal${c.email?"":` <span class="small muted">(cadastre o e-mail acima para ativar)</span>`}</span></label>`:""}</div>
     ${pode("financeiro")||!m.id ? blocoFinCliente(Object.assign({}, c, {id:m.id}), ed) : ""}
     ${portal}
     ${ps.length?`<div><h3 style="margin-bottom:6px">Processos</h3>${ps.map(p=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="mono gold" data-act="abrir-processo" data-id="${p.id}" style="cursor:pointer">${esc(p.numero||"sem número")}</span>${chipArea(p.area)}<span class="small muted">${esc(p.fase||"")}</span></div>`).join("")}</div>`:""}
